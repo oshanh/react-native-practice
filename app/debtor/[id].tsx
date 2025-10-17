@@ -3,8 +3,8 @@ import AddPaymentModal from '@/components/AddPaymentModal';
 import { useSQLiteContext } from '@/database/db';
 import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtorBalance } from '@/database/debtorService';
 import { Debtor } from '@/types/debtor';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -25,6 +25,14 @@ export default function DebtorDetailScreen() {
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
+
+  // Reload data whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadDebtor();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id])
+  );
 
   useEffect(() => {
     loadDebtor();

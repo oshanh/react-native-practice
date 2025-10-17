@@ -2,13 +2,21 @@ import AddDebtorModal from '@/components/AddDebtorModal';
 import Button from '@/components/Button';
 import { useDebtors } from '@/database/useDebtors';
 import { Debtor } from '@/types/debtor';
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function DebtorsScreen() {
   const { debtors, loading, error, reload } = useDebtors();
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Reload debtors whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const renderDebtor = ({ item }: { item: Debtor }) => (
     <Link href={`/debtor/${item.id}` as any} asChild>
@@ -94,6 +102,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#25292e',
   },
   header: {
     padding: 20,

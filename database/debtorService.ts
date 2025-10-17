@@ -129,22 +129,21 @@ export const getAllDebtors = async (db: SQLiteDatabase): Promise<Debtor[]> => {
       );
 
       try {
-        // Fetch phone numbers for each debtor
-        const debtorsWithPhones = await Promise.all(
-          debtors.map(async (debtor) => {
-            const phoneResult = await phonesStmt.executeAsync([debtor.id]);
-            const phones = await phoneResult.getAllAsync() as { phone_number: string }[];
+        // Fetch phone numbers for each debtor sequentially to avoid reuse issues
+        const debtorsWithPhones: Debtor[] = [];
+        for (const debtor of debtors) {
+          const phoneResult = await phonesStmt.executeAsync([debtor.id]);
+          const phones = await phoneResult.getAllAsync() as { phone_number: string }[];
 
-            return {
-              id: debtor.id,
-              name: debtor.name,
-              phoneNumbers: phones.map(p => p.phone_number),
-              balance: debtor.balance,
-              createdAt: debtor.created_at,
-              updatedAt: debtor.updated_at,
-            };
-          })
-        );
+          debtorsWithPhones.push({
+            id: debtor.id,
+            name: debtor.name,
+            phoneNumbers: phones.map(p => p.phone_number),
+            balance: debtor.balance,
+            createdAt: debtor.created_at,
+            updatedAt: debtor.updated_at,
+          });
+        }
 
         return debtorsWithPhones;
       } finally {
