@@ -1,5 +1,5 @@
 {
-  "name": "debit-m1",
+  "name": "debit-manager",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
