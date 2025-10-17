@@ -56,7 +56,7 @@ export default function Index() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.statsContainer}>
-          {/* Total Balance Card */}
+          {/* Total Balance Card - Highlighted */}
           <View style={[styles.statCard, styles.balanceCard]}>
             <Text style={styles.statLabel}>Total Balance</Text>
             <Text style={[styles.statValue, styles.balanceValue]}>
@@ -67,28 +67,31 @@ export default function Index() {
             </Text>
           </View>
 
-          {/* Total IN Card */}
-          <View style={[styles.statCard, styles.inCard]}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.iconText}>↓</Text>
+          {/* IN and OUT Cards in Row */}
+          <View style={styles.rowContainer}>
+            {/* Total IN Card */}
+            <View style={[styles.statCard, styles.smallCard, styles.inCard]}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.iconText}>↓</Text>
+              </View>
+              <Text style={styles.statLabel}>Received</Text>
+              <Text style={[styles.statValue, styles.smallValue, styles.inValue]}>
+                ${stats.totalIn.toFixed(2)}
+              </Text>
+              <Text style={styles.statDescription}>Payments</Text>
             </View>
-            <Text style={styles.statLabel}>Total Received</Text>
-            <Text style={[styles.statValue, styles.inValue]}>
-              ${stats.totalIn.toFixed(2)}
-            </Text>
-            <Text style={styles.statDescription}>Payments received</Text>
-          </View>
 
-          {/* Total OUT Card */}
-          <View style={[styles.statCard, styles.outCard]}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.iconText}>↑</Text>
+            {/* Total OUT Card */}
+            <View style={[styles.statCard, styles.smallCard, styles.outCard]}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.iconText}>↑</Text>
+              </View>
+              <Text style={styles.statLabel}>Lent</Text>
+              <Text style={[styles.statValue, styles.smallValue, styles.outValue]}>
+                ${stats.totalOut.toFixed(2)}
+              </Text>
+              <Text style={styles.statDescription}>Money out</Text>
             </View>
-            <Text style={styles.statLabel}>Total Lent</Text>
-            <Text style={[styles.statValue, styles.outValue]}>
-              ${stats.totalOut.toFixed(2)}
-            </Text>
-            <Text style={styles.statDescription}>Money lent out</Text>
           </View>
         </View>
 
@@ -140,6 +143,10 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  rowContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   statCard: {
     backgroundColor: '#1a1d21',
     borderRadius: 12,
@@ -151,10 +158,20 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  smallCard: {
+    flex: 1,
+    padding: 12,
+  },
   balanceCard: {
-    backgroundColor: '#2d3748',
-    borderWidth: 2,
-    borderColor: '#4a5568',
+    backgroundColor: '#4a1a1a',
+    borderWidth: 3,
+    borderColor: '#f56565',
+    padding: 24,
+    shadowColor: '#f56565',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   inCard: {
     backgroundColor: '#1a3d2e',
@@ -167,16 +184,16 @@ const styles = StyleSheet.create({
     borderColor: '#5f2d2d',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   iconText: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#fff',
   },
   statLabel: {
@@ -187,13 +204,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,
   },
+  smallValue: {
+    fontSize: 22,
+  },
   balanceValue: {
-    color: '#4299e1',
+    color: '#f56565',
+    fontSize: 40,
   },
   inValue: {
     color: '#48bb78',
