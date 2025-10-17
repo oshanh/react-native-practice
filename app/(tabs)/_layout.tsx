@@ -1,7 +1,15 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
-
+const HomeIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+  <Ionicons name={focused ? 'home-sharp' : 'home-outline'} color={color} size={24} />
+);
+const DebtorsIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+  <Ionicons name={focused ? 'people' : 'people-outline'} color={color} size={24} />
+);
+const AboutIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+  <Ionicons name={focused ? 'information-circle' : 'information-circle-outline'} color={color} size={24} />
+);
 
 export default function TabLayout() {
   return (
@@ -23,18 +31,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home-sharp' : 'home-outline'} color={color} size={24} />
-          ),
+          tabBarIcon: HomeIcon,
         }}
       />
       <Tabs.Screen
         name="debtors"
         options={{
           title: 'Debtors',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} color={color} size={24}/>
-          ),
+          tabBarIcon: DebtorsIcon,
           headerShown: false,
         }}
       />
@@ -42,9 +46,7 @@ export default function TabLayout() {
         name="about"
         options={{
           title: 'About',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'information-circle' : 'information-circle-outline'} color={color} size={24}/>
-          ),
+          tabBarIcon: AboutIcon,
         }}
       />
       

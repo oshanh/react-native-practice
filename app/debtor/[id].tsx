@@ -1,16 +1,18 @@
+import AddDebtModal from '@/components/AddDebtModal';
+import AddPaymentModal from '@/components/AddPaymentModal';
 import { useSQLiteContext } from '@/database/db';
-import { deleteDebtor, getDebtorById, updateDebtorBalance } from '@/database/debtorService';
+import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtorBalance } from '@/database/debtorService';
 import { Debtor } from '@/types/debtor';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function DebtorDetailScreen() {
@@ -19,10 +21,22 @@ export default function DebtorDetailScreen() {
   const db = useSQLiteContext();
   const [debtor, setDebtor] = useState<Debtor | null>(null);
   const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<Array<any>>([]);
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
   useEffect(() => {
     loadDebtor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (debtor) {
+      loadTransactions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debtor, filterType]);
 
   const loadDebtor = async () => {
     try {
@@ -37,6 +51,12 @@ export default function DebtorDetailScreen() {
     }
   };
 
+  const loadTransactions = async () => {
+    if (!debtor) return;
+    let txs = await getTransactionsForDebtor(db, debtor.id, filterType === 'ALL' ? undefined : filterType);
+    setTransactions(txs);
+  };
+
   const handleCall = (phoneNumber: string) => {
     Linking.openURL(`tel:${phoneNumber}`);
   };
@@ -45,75 +65,39 @@ export default function DebtorDetailScreen() {
     Linking.openURL(`sms:${phoneNumber}`);
   };
 
-  const handleAddPayment = () => {
-    Alert.prompt(
-      'Add Payment',
-      'Enter payment amount:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: async (amount) => {
-            if (amount && debtor) {
-              const payment = Number.parseFloat(amount);
-              if (!isNaN(payment) && payment > 0) {
-                try {
-                  const newBalance = debtor.balance - payment;
-                  await updateDebtorBalance(db, debtor.id, newBalance);
-                  loadDebtor();
-                  Alert.alert('Success', `Payment of $${payment.toFixed(2)} added`);
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to add payment');
-                }
-              } else {
-                Alert.alert('Error', 'Please enter a valid amount');
-              }
-            }
-          },
-        },
-      ],
-      'plain-text',
-      '',
-      'numeric'
-    );
+  const handleAddPayment = () => setShowPaymentModal(true);
+  const handleAddDebt = () => setShowDebtModal(true);
+
+  const handleSubmitPayment = async (amount: number, date: string, time: string, note: string) => {
+    if (!debtor) return;
+    try {
+      await addTransaction(db, debtor.id, 'IN', date, time, amount, note);
+      await updateDebtorBalance(db, debtor.id, debtor.balance - amount);
+      await loadDebtor();
+      await loadTransactions();
+      Alert.alert('Success', `Payment of $${amount.toFixed(2)} added`);
+    } catch {
+      Alert.alert('Error', 'Failed to add payment');
+    }
+    setShowPaymentModal(false);
   };
 
-  const handleAddDebt = () => {
-    Alert.prompt(
-      'Add Debt',
-      'Enter debt amount:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: async (amount) => {
-            if (amount && debtor) {
-              const debt = Number.parseFloat(amount);
-              if (!isNaN(debt) && debt > 0) {
-                try {
-                  const newBalance = debtor.balance + debt;
-                  await updateDebtorBalance(db, debtor.id, newBalance);
-                  loadDebtor();
-                  Alert.alert('Success', `Debt of $${debt.toFixed(2)} added`);
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to add debt');
-                }
-              } else {
-                Alert.alert('Error', 'Please enter a valid amount');
-              }
-            }
-          },
-        },
-      ],
-      'plain-text',
-      '',
-      'numeric'
-    );
+  const handleSubmitDebt = async (amount: number, date: string, time: string, note: string) => {
+    if (!debtor) return;
+    try {
+      await addTransaction(db, debtor.id, 'OUT', date, time, amount, note);
+      await updateDebtorBalance(db, debtor.id, debtor.balance + amount);
+      await loadDebtor();
+      await loadTransactions();
+      Alert.alert('Success', `Debt of $${amount.toFixed(2)} added`);
+    } catch {
+      Alert.alert('Error', 'Failed to add debt');
+    }
+    setShowDebtModal(false);
   };
 
   const handleDelete = () => {
     if (!debtor) return;
-
     Alert.alert(
       'Delete Debtor',
       `Are you sure you want to delete ${debtor.name}? This action cannot be undone.`,
@@ -122,15 +106,18 @@ export default function DebtorDetailScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDebtor(db, debtor.id);
-              Alert.alert('Success', 'Debtor deleted successfully');
-              router.back();
-            } catch (error) {
-              console.error('Error deleting debtor:', error);
-              Alert.alert('Error', 'Failed to delete debtor');
-            }
+          onPress: () => {
+            // Use setTimeout to allow async
+            setTimeout(async () => {
+              try {
+                await deleteDebtor(db, debtor.id);
+                Alert.alert('Success', 'Debtor deleted successfully');
+                router.back();
+              } catch (error) {
+                console.error('Error deleting debtor:', error);
+                Alert.alert('Error', 'Failed to delete debtor');
+              }
+            }, 0);
           },
         },
       ]
@@ -173,7 +160,11 @@ export default function DebtorDetailScreen() {
               ${Math.abs(debtor.balance).toFixed(2)}
             </Text>
             <Text style={styles.balanceNote}>
-              {debtor.balance > 0 ? 'owes you' : debtor.balance === 0 ? 'settled' : 'you owe'}
+              {(() => {
+                if (debtor.balance > 0) return 'owes you';
+                if (debtor.balance === 0) return 'settled';
+                return 'you owe';
+              })()}
             </Text>
           </View>
         </View>
@@ -183,8 +174,8 @@ export default function DebtorDetailScreen() {
       {/* Phone Numbers Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Phone Numbers</Text>
-        {debtor.phoneNumbers.map((phone, index) => (
-          <View key={index} style={styles.phoneCard}>
+        {debtor.phoneNumbers.map((phone) => (
+          <View key={phone} style={styles.phoneCard}>
             <Text style={styles.phoneNumber}>{phone}</Text>
             <View style={styles.phoneActions}>
               <TouchableOpacity
@@ -204,7 +195,7 @@ export default function DebtorDetailScreen() {
         ))}
       </View>
 
-      {/* Transaction Actions */}
+      {/* Transaction Actions & Filter */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Transactions</Text>
         <View style={styles.transactionButtons}>
@@ -217,7 +208,49 @@ export default function DebtorDetailScreen() {
             <Text style={styles.transactionButtonText}>Add Debt</Text>
           </TouchableOpacity>
         </View>
+        <View style={styles.filterRow}>
+          <TouchableOpacity onPress={() => setFilterType('ALL')} style={[styles.filterButton, filterType === 'ALL' && styles.filterButtonActive]}>
+            <Text style={styles.filterButtonText}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFilterType('IN')} style={[styles.filterButton, filterType === 'IN' && styles.filterButtonActive]}>
+            <Text style={styles.filterButtonText}>Received</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFilterType('OUT')} style={[styles.filterButton, filterType === 'OUT' && styles.filterButtonActive]}>
+            <Text style={styles.filterButtonText}>Debt</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Transactions List */}
+        {transactions.length === 0 ? (
+          <Text style={styles.noTransactions}>No transactions found.</Text>
+        ) : (
+          transactions.map(tx => (
+            <View key={tx.id} style={styles.transactionCard}>
+              <View style={styles.transactionRow}>
+                <Text style={styles.transactionIcon}>{tx.type === 'IN' ? '⬇️' : '⬆️'}</Text>
+                <View style={styles.transactionInfo}>
+                  <Text style={styles.transactionAmount}>{tx.type === 'IN' ? '+' : '-'}${tx.amount.toFixed(2)}</Text>
+                  <Text style={styles.transactionNote}>{tx.note || ''}</Text>
+                </View>
+                <View style={styles.transactionMeta}>
+                  <Text style={styles.transactionDate}>{tx.date}</Text>
+                  <Text style={styles.transactionTime}>{tx.time}</Text>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </View>
+          {/* Modals for adding debt/payment */}
+          <AddDebtModal
+            visible={showDebtModal}
+            onClose={() => setShowDebtModal(false)}
+            onAdd={handleSubmitDebt}
+          />
+          <AddPaymentModal
+            visible={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            onAdd={handleSubmitPayment}
+          />
 
       {/* Metadata Section */}
       <View style={styles.section}>
@@ -460,5 +493,68 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  filterButton: {
+    backgroundColor: '#333',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  filterButtonActive: {
+    backgroundColor: '#0a7ea4',
+  },
+  filterButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  noTransactions: {
+    color: '#9ba1a6',
+    fontStyle: 'italic',
+    marginTop: 12,
+  },
+  transactionCard: {
+    backgroundColor: '#23262a',
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 10,
+  },
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transactionIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  transactionNote: {
+    fontSize: 13,
+    color: '#9ba1a6',
+    marginTop: 2,
+  },
+  transactionMeta: {
+    alignItems: 'flex-end',
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#9ba1a6',
+  },
+  transactionTime: {
+    fontSize: 12,
+    color: '#9ba1a6',
   },
 });

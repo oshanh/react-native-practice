@@ -1,3 +1,68 @@
+// Add a transaction (debt or received payment)
+export const addTransaction = async (
+  db: SQLiteDatabase,
+  debtorId: number,
+  type: 'IN' | 'OUT',
+  date: string,
+  time: string,
+  amount: number,
+  note?: string
+): Promise<number> => {
+  const stmt = await db.prepareAsync(
+    'INSERT INTO transactions (debtor_id, type, date, time, amount, note) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  try {
+    const result = await stmt.executeAsync([
+      debtorId,
+      type,
+      date,
+      time,
+      amount,
+      note ?? null
+    ]);
+    return result.lastInsertRowId;
+  } finally {
+    await stmt.finalizeAsync();
+  }
+};
+
+// Get all transactions for a debtor, optionally filtered by type
+export const getTransactionsForDebtor = async (
+  db: SQLiteDatabase,
+  debtorId: number,
+  type?: 'IN' | 'OUT'
+): Promise<Array<{
+  id: number;
+  type: 'IN' | 'OUT';
+  date: string;
+  time: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+}>> => {
+  let query = 'SELECT * FROM transactions WHERE debtor_id = ?';
+  const params: any[] = [debtorId];
+  if (type) {
+    query += ' AND type = ?';
+    params.push(type);
+  }
+  query += ' ORDER BY date DESC, time DESC';
+  const stmt = await db.prepareAsync(query);
+  try {
+    const result = await stmt.executeAsync(params);
+    return await result.getAllAsync() as Array<{
+      id: number;
+      type: 'IN' | 'OUT';
+      date: string;
+      time: string;
+      amount: number;
+      note: string | null;
+      created_at: string;
+    }>;
+  } finally {
+    await stmt.finalizeAsync();
+  }
+};
 import { Debtor } from '@/types/debtor';
 import type { SQLiteDatabase } from 'expo-sqlite';
 

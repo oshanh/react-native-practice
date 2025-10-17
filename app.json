@@ -19,16 +19,20 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.oshandev.debitm1"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
       "build": {
         "babel": {
-          "include": ["wa-sqlite"]
+          "include": [
+            "wa-sqlite"
+          ]
         }
-    }},
+      }
+    },
     "plugins": [
       "expo-router",
       [

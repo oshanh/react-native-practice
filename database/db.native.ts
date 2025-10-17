@@ -1,12 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { SQLiteProvider } from 'expo-sqlite';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   const DATABASE_VERSION = 2;
   const result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   let currentDbVersion = result?.user_version ?? 0;
-  if (currentDbVersion >= DATABASE_VERSION) {
-    return;
-  }
+  if (currentDbVersion >= DATABASE_VERSION) return;
+
   if (currentDbVersion === 0) {
     await db.execAsync(`
       PRAGMA journal_mode = 'wal';
@@ -28,6 +28,7 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     `);
     currentDbVersion = 1;
   }
+
   if (currentDbVersion === 1) {
     await db.execAsync(`
       CREATE TABLE transactions (
@@ -45,12 +46,9 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     `);
     currentDbVersion = 2;
   }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
-export { SQLiteProvider as getSQLiteProviderShim, useSQLiteContext } from 'expo-sqlite';
-// Provide a function to mirror web helper API
-export function getSQLiteProvider() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require('expo-sqlite').SQLiteProvider;
-}
 
+export { useSQLiteContext } from 'expo-sqlite';
+export function getSQLiteProvider() { return SQLiteProvider; }

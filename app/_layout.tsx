@@ -1,8 +1,8 @@
-import { migrateDbIfNeeded } from "@/database/db";
+import { getSQLiteProvider, migrateDbIfNeeded } from "@/database/db";
 import { Stack } from "expo-router";
-import { SQLiteProvider } from "expo-sqlite";
 import { Suspense } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+const SQLiteProvider: any = getSQLiteProvider();
 
 // Loading fallback component
 function LoadingFallback() {
