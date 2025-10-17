@@ -27,7 +27,7 @@ export default function DebtorsScreen() {
         <View style={styles.debtorInfo}>
           <Text style={styles.debtorName}>{item.name}</Text>
           <Text style={styles.debtorBalance}>
-            Balance: ${item.balance.toFixed(2)}
+            Balance: Rs. {item.balance.toFixed(2)}
           </Text>
           <Text style={styles.debtorPhones}>
             {item.phoneNumbers.join(', ') || 'No phone numbers'}

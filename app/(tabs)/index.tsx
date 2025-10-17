@@ -60,7 +60,7 @@ export default function Index() {
           <View style={[styles.statCard, styles.balanceCard]}>
             <Text style={styles.statLabel}>Total Balance</Text>
             <Text style={[styles.statValue, styles.balanceValue]}>
-              ${stats.totalBalance.toFixed(2)}
+              Rs.{stats.totalBalance.toFixed(2)}
             </Text>
             <Text style={styles.statNote}>
               {getBalanceNote(stats.totalBalance)}
@@ -76,7 +76,7 @@ export default function Index() {
               </View>
               <Text style={styles.statLabel}>Received</Text>
               <Text style={[styles.statValue, styles.smallValue, styles.inValue]}>
-                ${stats.totalIn.toFixed(2)}
+                Rs.{stats.totalIn.toFixed(2)}
               </Text>
               <Text style={styles.statDescription}>Payments</Text>
             </View>
@@ -88,7 +88,7 @@ export default function Index() {
               </View>
               <Text style={styles.statLabel}>Lent</Text>
               <Text style={[styles.statValue, styles.smallValue, styles.outValue]}>
-                ${stats.totalOut.toFixed(2)}
+                Rs.{stats.totalOut.toFixed(2)}
               </Text>
               <Text style={styles.statDescription}>Money out</Text>
             </View>
@@ -101,13 +101,13 @@ export default function Index() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Net Position:</Text>
             <Text style={[styles.summaryValue, stats.totalBalance >= 0 ? styles.positiveText : styles.negativeText]}>
-              ${Math.abs(stats.totalBalance).toFixed(2)} {stats.totalBalance >= 0 ? 'owed to you' : 'you owe'}
+              Rs.{Math.abs(stats.totalBalance).toFixed(2)} {stats.totalBalance >= 0 ? 'owed to you' : 'you owe'}
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Transactions:</Text>
             <Text style={styles.summaryValue}>
-              ${(stats.totalIn + stats.totalOut).toFixed(2)}
+              Rs.{(stats.totalIn + stats.totalOut).toFixed(2)}
             </Text>
           </View>
         </View>

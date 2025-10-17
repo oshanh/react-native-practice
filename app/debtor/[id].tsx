@@ -165,7 +165,7 @@ export default function DebtorDetailScreen() {
           <Text style={styles.name}>{debtor.name}</Text>
           <View style={styles.balanceContainer}>
             <Text style={[styles.balance, debtor.balance > 0 ? styles.balancePositive : styles.balanceZero]}>
-              ${Math.abs(debtor.balance).toFixed(2)}
+              Rs.{Math.abs(debtor.balance).toFixed(2)}
             </Text>
             <Text style={styles.balanceNote}>
               {(() => {
@@ -236,7 +236,7 @@ export default function DebtorDetailScreen() {
               <View style={styles.transactionRow}>
                 <Text style={styles.transactionIcon}>{tx.type === 'IN' ? '⬇️' : '⬆️'}</Text>
                 <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionAmount}>{tx.type === 'IN' ? '+' : '-'}${tx.amount.toFixed(2)}</Text>
+                  <Text style={styles.transactionAmount}>{tx.type === 'IN' ? '+' : '-'}Rs.{tx.amount.toFixed(2)}</Text>
                   <Text style={styles.transactionNote}>{tx.note || ''}</Text>
                 </View>
                 <View style={styles.transactionMeta}>

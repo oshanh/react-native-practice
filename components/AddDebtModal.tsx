@@ -53,7 +53,7 @@ export default function AddDebtModal({ visible, onClose, onAdd }: Readonly<AddDe
           <Text style={styles.title}>Add Debt</Text>
           <TextInput
             style={styles.input}
-            placeholder="Amount"
+            placeholder="Amount Rs."
             keyboardType="numeric"
             value={amount}
             onChangeText={setAmount}
