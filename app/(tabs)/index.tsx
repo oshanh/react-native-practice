@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   smallValue: {
-    fontSize: 22,
+    fontSize: 20,
   },
   balanceValue: {
     color: '#f56565',

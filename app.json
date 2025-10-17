@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "debit-m1",
+    "name": "Debit Manager",
     "slug": "debit-m1",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -52,6 +52,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "acd8734d-202a-4bc8-b538-14295d63b046"
+      }
     }
   }
 }
