@@ -29,6 +29,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="debtors"
+        options={{
+          title: 'Debtors',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'people' : 'people-outline'} color={color} size={24}/>
+          ),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="about"
         options={{
           title: 'About',
@@ -37,6 +47,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      
     </Tabs>
   );
 }

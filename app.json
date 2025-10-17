@@ -23,8 +23,12 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
+      "favicon": "./assets/images/favicon.png",
+      "build": {
+        "babel": {
+          "include": ["wa-sqlite"]
+        }
+    }},
     "plugins": [
       "expo-router",
       [
@@ -38,7 +42,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
