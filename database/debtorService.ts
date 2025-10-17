@@ -295,3 +295,62 @@ export const updateDebtorBalance = async (
     throw error;
   }
 };
+
+// Get statistics for all debtors and transactions
+export const getStatistics = async (
+  db: SQLiteDatabase
+): Promise<{
+  totalBalance: number;
+  totalIn: number;
+  totalOut: number;
+}> => {
+  try {
+    // Get total balance from all debtors
+    const balanceStmt = await db.prepareAsync(
+      'SELECT COALESCE(SUM(balance), 0) as total FROM debtors'
+    );
+    let totalBalance = 0;
+    try {
+      const balanceResult = await balanceStmt.executeAsync();
+      const balanceData = await balanceResult.getFirstAsync() as { total: number } | null;
+      totalBalance = balanceData?.total ?? 0;
+    } finally {
+      await balanceStmt.finalizeAsync();
+    }
+
+    // Get total IN transactions
+    const inStmt = await db.prepareAsync(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?'
+    );
+    let totalIn = 0;
+    try {
+      const inResult = await inStmt.executeAsync(['IN']);
+      const inData = await inResult.getFirstAsync() as { total: number } | null;
+      totalIn = inData?.total ?? 0;
+    } finally {
+      await inStmt.finalizeAsync();
+    }
+
+    // Get total OUT transactions
+    const outStmt = await db.prepareAsync(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?'
+    );
+    let totalOut = 0;
+    try {
+      const outResult = await outStmt.executeAsync(['OUT']);
+      const outData = await outResult.getFirstAsync() as { total: number } | null;
+      totalOut = outData?.total ?? 0;
+    } finally {
+      await outStmt.finalizeAsync();
+    }
+
+    return {
+      totalBalance,
+      totalIn,
+      totalOut,
+    };
+  } catch (error) {
+    console.error('Error fetching statistics:', error);
+    throw error;
+  }
+};
