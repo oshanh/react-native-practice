@@ -1,5 +1,6 @@
 import { useSQLiteContext } from '@/database/db';
 import { getStatistics } from '@/database/debtorService';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -19,7 +20,7 @@ export default function Index() {
 
   const formatRelativeTime = (date: Date): string => {
     const diffMs = now.getTime() - date.getTime();
-    if (diffMs < 0) return 'in the future';
+    if (diffMs < 0) return 'just now';
     const seconds = Math.floor(diffMs / 1000);
     if (seconds < 10) return 'just now';
     const steps = [
@@ -116,8 +117,13 @@ export default function Index() {
               {`Last backup: ${lastBackup ? formatRelativeTime(lastBackup) : '—'}`}
             </Text>
           )}
-          <TouchableOpacity style={styles.backupButton} onPress={handleBackupNow}>
-            <Text style={styles.backupButtonText}>Backup Now</Text>
+          <TouchableOpacity
+            style={styles.backupButton}
+            onPress={handleBackupNow}
+            accessibilityRole="button"
+            accessibilityLabel="Backup now"
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -223,6 +229,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backupButtonText: {
     color: '#fff',
