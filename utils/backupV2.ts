@@ -1,10 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import {
-    getAccessToken,
-    getOrCreateBackupFolder,
-    isSignedInToGoogleDrive,
-    uploadFileToGoogleDrive,
+  getAccessToken,
+  getOrCreateBackupFolder,
+  isSignedInToGoogleDrive,
+  uploadFileToGoogleDrive,
 } from './googleDriveService';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Sharing: any = require('expo-sharing');
