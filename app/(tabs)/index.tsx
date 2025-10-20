@@ -77,113 +77,7 @@ export default function Index() {
     return '✓ All settled';
   };
 
-  const handleRestoreBackup = async () => {
-    try {
-      // Flush and close DB before overwriting the file
-      try {
-        console.log('[Restore] Running WAL checkpoint before close...');
-        await db.execAsync?.("PRAGMA wal_checkpoint(TRUNCATE);");
-      } catch (e) {
-        console.log('[Restore] wal_checkpoint failed (ok to ignore):', e);
-      }
-      try {
-        console.log('[Restore] Closing SQLite database before restore...');
-        await (db as any)?.closeAsync?.();
-        // tiny delay to ensure file handles are released
-        await new Promise((r) => setTimeout(r, 150));
-      } catch (e) {
-        console.log('[Restore] closeAsync failed (ok to ignore):', e);
-      }
 
-      const DOC_DIR = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
-      const SQLITE_DIR = `${DOC_DIR}SQLite/`;
-      // Determine the actual DB file currently used on this device
-      const DB_PATH = await resolveDatabasePath();
-      const ALT_DB_PATH = DB_PATH.endsWith('.db') ? DB_PATH.slice(0, -3) : `${DB_PATH}.db`;
-      console.log('[Restore] SQLite dir:', SQLITE_DIR);
-      try {
-        const listing = await FileSystem.readDirectoryAsync(SQLITE_DIR);
-        console.log('[Restore] SQLite listing BEFORE:', listing);
-      } catch (e) {
-        console.log('[Restore] Failed to list SQLite dir BEFORE:', e);
-      }
-  const beforeInfo = await FileSystem.getInfoAsync(DB_PATH);
-  console.log('[Restore] DB_PATH used for restore:', DB_PATH, 'info:', JSON.stringify(beforeInfo));
-  try { console.log('[Restore] ALT_DB_PATH:', ALT_DB_PATH, 'info:', JSON.stringify(await FileSystem.getInfoAsync(ALT_DB_PATH))); } catch {}
-
-      // Ensure no leftover files before restore
-      for (const p of [DB_PATH, ALT_DB_PATH]) {
-        try { await FileSystem.deleteAsync(p, { idempotent: true }); } catch {}
-        try { await FileSystem.deleteAsync(`${p}-wal`, { idempotent: true }); } catch {}
-        try { await FileSystem.deleteAsync(`${p}-shm`, { idempotent: true }); } catch {}
-      }
-
-      // Try Google Drive restore first
-      const signedIn = await isSignedInToGoogleDrive();
-      if (signedIn) {
-        const ok = await restoreLatestBackupFromGoogleDrive(DB_PATH);
-        if (ok) {
-          // Also copy to alternate filename variant to cover both (with and without .db)
-          if (ALT_DB_PATH !== DB_PATH) {
-            try {
-              await FileSystem.copyAsync({ from: DB_PATH, to: ALT_DB_PATH });
-              console.log('[Restore] Also copied to ALT path:', ALT_DB_PATH);
-            } catch (e) {
-              console.log('[Restore] Skipped copying to ALT path:', ALT_DB_PATH, e);
-            }
-          }
-          // Remove any WAL/SHM files to prevent stale state
-          const walCandidates = [DB_PATH, ALT_DB_PATH];
-          for (const p of walCandidates) {
-            try { await FileSystem.deleteAsync(`${p}-wal`, { idempotent: true }); } catch {}
-            try { await FileSystem.deleteAsync(`${p}-shm`, { idempotent: true }); } catch {}
-          }
-          try {
-            const listingAfter = await FileSystem.readDirectoryAsync(SQLITE_DIR);
-            console.log('[Restore] SQLite listing AFTER:', listingAfter);
-          } catch {}
-          const afterInfo = await FileSystem.getInfoAsync(DB_PATH);
-          console.log('[Restore] DB_PATH AFTER restore info:', JSON.stringify(afterInfo));
-          try { console.log('[Restore] ALT_DB_PATH AFTER restore info:', JSON.stringify(await FileSystem.getInfoAsync(ALT_DB_PATH))); } catch {}
-          Alert.alert(
-            'Restore complete',
-            'Latest backup from Google Drive restored. The app will reload to apply changes.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  try { DevSettings.reload(); } catch {}
-                },
-              },
-            ]
-          );
-          return;
-        }
-      }
-      // Fallback: Pick a local file
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/x-sqlite3',
-        copyToCacheDirectory: true,
-      });
-      if (!result?.assets?.[0]?.uri || result.canceled) return;
-      const uri = result.assets[0].uri;
-      await FileSystem.copyAsync({ from: uri, to: DB_PATH });
-      if (ALT_DB_PATH !== DB_PATH) {
-        try { await FileSystem.copyAsync({ from: DB_PATH, to: ALT_DB_PATH }); } catch {}
-      }
-      try { await FileSystem.deleteAsync(`${DB_PATH}-wal`, { idempotent: true }); } catch {}
-      try { await FileSystem.deleteAsync(`${DB_PATH}-shm`, { idempotent: true }); } catch {}
-      Alert.alert(
-        'Restore complete',
-        'Backup restored from local file. The app will reload to apply changes.',
-        [
-          { text: 'OK', onPress: () => { try { DevSettings.reload(); } catch {} } },
-        ]
-      );
-    } catch (e: any) {
-      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
-    }
-  };
 
   const handleBackupNow = async () => {
     try {
@@ -237,14 +131,7 @@ export default function Index() {
             >
               <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.restoreButton}
-              onPress={handleRestoreBackup}
-              accessibilityRole="button"
-              accessibilityLabel="Restore backup"
-            >
-              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
-            </TouchableOpacity>
+            
           </View>
  
         </View>
@@ -316,14 +203,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  restoreButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+ 
   
   container: {
     flex: 1,
