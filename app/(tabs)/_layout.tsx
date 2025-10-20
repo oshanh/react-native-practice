@@ -1,3 +1,6 @@
+const BackupsIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+  <Ionicons name={focused ? 'cloud-sharp' : 'cloud-outline'} color={color} size={24} />
+);
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 
@@ -41,6 +44,13 @@ export default function TabLayout() {
           title: 'Debtors',
           tabBarIcon: DebtorsIcon,
           headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="backups"
+        options={{
+          title: 'Backups',
+          tabBarIcon: BackupsIcon,
         }}
       />
       <Tabs.Screen
