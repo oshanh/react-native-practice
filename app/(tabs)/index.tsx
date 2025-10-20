@@ -42,13 +42,15 @@ export default function Index() {
 
   const handleBackupNow = async () => {
     try {
-      const { uri, uploaded, shared } = await backupNow();
-      if (uploaded) {
+      const { uri, uploaded, shared, googleDrive } = await backupNow();
+      if (googleDrive) {
+        Alert.alert('Backup complete', 'Backup uploaded to Google Drive successfully! ☁️');
+      } else if (uploaded) {
         Alert.alert('Backup complete', 'Backup uploaded successfully.');
       } else if (shared) {
         // Shared via OS share sheet
       } else {
-        Alert.alert('Backup saved', `Backup saved at ${uri}`);
+        Alert.alert('Backup saved', `Backup saved locally at ${uri}`);
       }
     } catch (e: any) {
       Alert.alert('Backup failed', e?.message ?? 'Unknown error');

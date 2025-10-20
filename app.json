@@ -53,7 +53,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-background-task"
+      "expo-background-task",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -67,6 +68,10 @@
       "backup": {
         "uploadUrl": "",
         "authToken": ""
+      },
+      "googleDrive": {
+        "webClientId": "188962916113-ga5ve15f5mvqv8smpkrieth2hk47vsua.apps.googleusercontent.com",
+        "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com"
       }
     }
   }

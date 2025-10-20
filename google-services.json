@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "712334585603",
+    "project_id": "debit-manager-app",
+    "storage_bucket": "debit-manager-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:712334585603:android:6611cc2f80cd861f884336",
+        "android_client_info": {
+          "package_name": "com.oshandev.debitm1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDSOEsxOX8wynJnqZIYdF_Bygk2ylL6mk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

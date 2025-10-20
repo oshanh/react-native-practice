@@ -1,4 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import {
+  getAccessToken,
+  getOrCreateBackupFolder,
+  isSignedInToGoogleDrive,
+  uploadFileToGoogleDrive,
+} from './googleDriveService';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Sharing: any = require('expo-sharing');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -113,13 +119,50 @@ export async function uploadBackupIfConfigured(uri: string): Promise<boolean> {
   }
 }
 
-export async function backupNow(): Promise<{ uri: string; uploaded: boolean; shared: boolean }> {
+export async function uploadToGoogleDrive(uri: string): Promise<boolean> {
+  try {
+    // Check if signed in to Google Drive
+    const isSignedIn = await isSignedInToGoogleDrive();
+    if (!isSignedIn) {
+      console.log('Not signed in to Google Drive');
+      return false;
+    }
+
+    // Get access token
+    const accessToken = await getAccessToken();
+
+    // Get or create backup folder
+    const folderId = await getOrCreateBackupFolder(accessToken);
+
+    // Get filename from URI
+    const fileName = uri.split('/').pop() || `debitmanager-${timestamp()}.db`;
+
+    // Upload to Google Drive
+    await uploadFileToGoogleDrive(accessToken, uri, fileName, folderId);
+
+    console.log('Backup uploaded to Google Drive successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to upload to Google Drive:', error);
+    return false;
+  }
+}
+
+export async function backupNow(): Promise<{ uri: string; uploaded: boolean; shared: boolean; googleDrive: boolean }> {
   const { uri } = await backupDatabase();
+  
+  // Try Google Drive first
+  const googleDrive = await uploadToGoogleDrive(uri);
+  if (googleDrive) {
+    return { uri, uploaded: false, shared: false, googleDrive };
+  }
+  
+  // Try configured upload endpoint
   const uploaded = await uploadBackupIfConfigured(uri);
   let shared = false;
   
   if (!uploaded) {
-    // Fallback to share sheet - user can choose Google Drive
+    // Fallback to share sheet - user can choose Google Drive manually
     try {
       shared = await shareBackup(uri);
     } catch (e) {
@@ -127,6 +170,6 @@ export async function backupNow(): Promise<{ uri: string; uploaded: boolean; sha
     }
   }
   
-  return { uri, uploaded, shared };
+  return { uri, uploaded, shared, googleDrive };
 }
 
