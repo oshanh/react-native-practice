@@ -1,6 +1,8 @@
 import { useSQLiteContext } from '@/database/db';
 import { getStatistics } from '@/database/debtorService';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -74,6 +76,28 @@ export default function Index() {
     return '✓ All settled';
   };
 
+  const handleRestoreBackup = async () => {
+    try {
+      // Pick a backup file
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/x-sqlite3',
+        copyToCacheDirectory: true,
+      });
+      if (!result || result.canceled || !result.assets || !result.assets[0]?.uri) return;
+      const uri = result.assets[0].uri;
+
+      // Overwrite the current database file
+      const DOC_DIR = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
+      const SQLITE_DIR = `${DOC_DIR}SQLite/`;
+      const DB_PATH = `${SQLITE_DIR}debitmanager.db`;
+
+      await FileSystem.copyAsync({ from: uri, to: DB_PATH });
+      Alert.alert('Restore complete', 'Backup restored successfully. Please restart the app.');
+    } catch (e: any) {
+      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
+    }
+  };
+
   const handleBackupNow = async () => {
     try {
       const { uri, uploaded, shared, googleDrive } = await backupNow();
@@ -117,14 +141,25 @@ export default function Index() {
               {`Last backup: ${lastBackup ? formatRelativeTime(lastBackup) : '—'}`}
             </Text>
           )}
-          <TouchableOpacity
-            style={styles.backupButton}
-            onPress={handleBackupNow}
-            accessibilityRole="button"
-            accessibilityLabel="Backup now"
-          >
-            <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.backupButton}
+              onPress={handleBackupNow}
+              accessibilityRole="button"
+              accessibilityLabel="Backup now"
+            >
+              <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.restoreButton}
+              onPress={handleRestoreBackup}
+              accessibilityRole="button"
+              accessibilityLabel="Restore backup"
+            >
+              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+ 
         </View>
 
         <View style={styles.statsContainer}>
@@ -189,6 +224,20 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  restoreButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
   container: {
     flex: 1,
     backgroundColor: '#25292e',
