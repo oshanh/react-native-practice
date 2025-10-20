@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import {
     getAccessToken,
     getOrCreateBackupFolder,
@@ -59,10 +60,41 @@ function timestamp(): string {
 
 export async function backupDatabase(): Promise<{ uri: string }> {
   const dbPath = await resolveDatabasePath();
+  // Try to flush WAL and close DB to ensure a consistent main DB file
+  const filename = dbPath.split('/').pop() ?? 'debitmanager';
+  const nameCandidates = [filename, filename.replace(/\.db$/i, '')];
+  let flushed = false;
+  for (const name of nameCandidates) {
+    try {
+      const db: SQLiteDatabase = await openDatabaseAsync(name);
+      try {
+        await db.execAsync("PRAGMA wal_checkpoint(TRUNCATE);");
+      } catch {}
+      try { await db.closeAsync?.(); } catch {}
+      flushed = true;
+      break;
+    } catch {
+      // try next candidate
+    }
+  }
+  if (!flushed) {
+    console.log('[Backup] Could not open DB to checkpoint WAL. Proceeding with copy.');
+  } else {
+    // small delay to ensure file handles released
+    await new Promise((r) => setTimeout(r, 150));
+  }
   await FileSystem.makeDirectoryAsync(BACKUP_DIR, { intermediates: true });
   const dest = `${BACKUP_DIR}debitmanager-${timestamp()}.db`;
-  
+  // Log source info
+  try {
+    const info = await FileSystem.getInfoAsync(dbPath);
+    console.log('[Backup] Source DB info:', JSON.stringify(info));
+  } catch {}
   await FileSystem.copyAsync({ from: dbPath, to: dest });
+  try {
+    const info = await FileSystem.getInfoAsync(dest);
+    console.log('[Backup] Backup file info:', JSON.stringify(info));
+  } catch {}
   
   return { uri: dest };
 }

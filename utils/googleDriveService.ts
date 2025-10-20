@@ -1,3 +1,54 @@
+/**
+ * Get and restore the latest backup file from Google Drive
+ */
+export async function restoreLatestBackupFromGoogleDrive(destinationUri: string): Promise<boolean> {
+  try {
+    console.log('[Restore] Getting Google Drive access token...');
+    const accessToken = await getAccessToken();
+    console.log('[Restore] Got access token:', !!accessToken);
+    const folderId = await getOrCreateBackupFolder(accessToken);
+    console.log('[Restore] Got/created backup folder:', folderId);
+    const files = await listBackupFiles(accessToken, folderId);
+    console.log('[Restore] Files found:', files.map(f => f.name));
+    if (!files || files.length === 0) throw new Error('No backup files found in Google Drive');
+    const latest = files[0];
+    console.log('[Restore] Latest file:', latest.name, latest.id);
+    // Download to a temp file first
+    const tempFile = destinationUri + '.tmp';
+    console.log('[Restore] Downloading to temp file:', tempFile);
+    await downloadFileFromGoogleDrive(accessToken, latest.id, tempFile);
+    const tempInfo = await FileSystem.getInfoAsync(tempFile);
+    console.log('[Restore] Temp file info:', JSON.stringify(tempInfo));
+    console.log('[Restore] Downloaded. Copying to DB:', destinationUri);
+    // Overwrite the DB file with the downloaded backup
+    await FileSystem.copyAsync({ from: tempFile, to: destinationUri });
+    const destInfo = await FileSystem.getInfoAsync(destinationUri);
+    console.log('[Restore] Destination info after copy:', JSON.stringify(destInfo));
+
+    // Also copy to alternate filename variant (with/without .db) to cover both cases
+    const altDestination = destinationUri.endsWith('.db')
+      ? destinationUri.slice(0, -3)
+      : `${destinationUri}.db`;
+    if (altDestination !== destinationUri) {
+      try {
+        await FileSystem.copyAsync({ from: tempFile, to: altDestination });
+        const altInfo = await FileSystem.getInfoAsync(altDestination);
+        console.log('[Restore] Alt destination info after copy:', JSON.stringify(altInfo));
+      } catch (e) {
+        console.log('[Restore] Copy to alt destination failed (ok to continue):', e);
+      }
+    }
+
+    console.log('[Restore] Copied. Deleting temp file.');
+    // Optionally, delete the temp file
+    await FileSystem.deleteAsync(tempFile, { idempotent: true });
+    console.log('[Restore] Restore complete!');
+    return true;
+  } catch (error) {
+    console.error('Failed to restore latest backup from Google Drive:', error);
+    return false;
+  }
+}
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
