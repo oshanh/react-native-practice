@@ -1,13 +1,41 @@
 import { useSQLiteContext } from '@/database/db';
 import { getStatistics } from '@/database/debtorService';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { backupNow } from '../../utils/backupV2';
+import { backupNow, getLastBackupTimestamp } from '../../utils/backupV2';
 
 export default function Index() {
   const db = useSQLiteContext();
   const [loading, setLoading] = useState(true);
+  const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date>(new Date());
+
+  // Update relative time every minute while this screen is mounted
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const formatRelativeTime = (date: Date): string => {
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) return 'in the future';
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 10) return 'just now';
+    const steps = [
+      { max: 60, denom: 1, label: 'sec' },
+      { max: 60, denom: 60, label: 'min' },
+      { max: 24, denom: 3600, label: 'hour' },
+      { max: 30, denom: 86400, label: 'day' },
+      { max: 12, denom: 2592000, label: 'month' },
+    ] as const;
+    for (const step of steps) {
+      const value = Math.floor(seconds / step.denom);
+      if (value < step.max) return `${value} ${step.label}${value === 1 ? '' : 's'} ago`;
+    }
+    const years = Math.floor(seconds / 31536000);
+    return `${years} year${years === 1 ? '' : 's'} ago`;
+  };
   const [stats, setStats] = useState({
     totalBalance: 0,
     totalIn: 0,
@@ -30,6 +58,11 @@ export default function Index() {
   useFocusEffect(
     useCallback(() => {
       loadStatistics();
+      // Load last backup timestamp when screen gains focus
+      (async () => {
+        const ts = await getLastBackupTimestamp();
+        setLastBackup(ts);
+      })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -43,6 +76,9 @@ export default function Index() {
   const handleBackupNow = async () => {
     try {
       const { uri, uploaded, shared, googleDrive } = await backupNow();
+      // Update last backup timestamp after a successful backup (any target)
+      const ts = await getLastBackupTimestamp();
+      setLastBackup(ts);
       if (googleDrive) {
         Alert.alert('Backup complete', 'Backup uploaded to Google Drive successfully! ☁️');
       } else if (uploaded) {
@@ -75,6 +111,11 @@ export default function Index() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Backup button */}
         <View style={styles.actionBar}>
+          {(
+            <Text style={styles.lastBackupText}>
+              {`Last backup: ${lastBackup ? formatRelativeTime(lastBackup) : '—'}`}
+            </Text>
+          )}
           <TouchableOpacity style={styles.backupButton} onPress={handleBackupNow}>
             <Text style={styles.backupButtonText}>Backup Now</Text>
           </TouchableOpacity>
@@ -169,7 +210,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lastBackupText: {
+    color: '#9aa0a6',
+    fontSize: 12,
+    marginRight: 8,
   },
   backupButton: {
     backgroundColor: '#2563eb',

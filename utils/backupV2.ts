@@ -13,6 +13,7 @@ const Constants: any = require('expo-constants');
 const DOC_DIR = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
 const SQLITE_DIR = `${DOC_DIR}SQLite/`;
 const BACKUP_DIR = `${DOC_DIR}backups/`;
+const META_FILE = `${DOC_DIR}backup_meta.json`;
 const DB_CANDIDATES = ['debitmanager', 'debitmanager.db'];
 
 async function ensureDir(uri: string) {
@@ -148,8 +149,40 @@ export async function uploadToGoogleDrive(uri: string): Promise<boolean> {
   }
 }
 
+export async function setLastBackupTimestamp(date: Date): Promise<void> {
+  try {
+    const payload = JSON.stringify({ lastBackupISO: date.toISOString() });
+    await FileSystem.writeAsStringAsync(META_FILE, payload, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  } catch (e) {
+    console.warn('Failed to write last backup timestamp:', e);
+  }
+}
+
+export async function getLastBackupTimestamp(): Promise<Date | null> {
+  try {
+    const info = await FileSystem.getInfoAsync(META_FILE);
+    if (!info.exists) return null;
+    const content = await FileSystem.readAsStringAsync(META_FILE, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const json = JSON.parse(content);
+    if (json?.lastBackupISO) {
+      const d = new Date(json.lastBackupISO);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  } catch (e) {
+    console.warn('Failed to read last backup timestamp:', e);
+    return null;
+  }
+}
+
 export async function backupNow(): Promise<{ uri: string; uploaded: boolean; shared: boolean; googleDrive: boolean }> {
   const { uri } = await backupDatabase();
+  // Record last backup time immediately after creating the local copy
+  await setLastBackupTimestamp(new Date());
   
   // Try Google Drive first
   const googleDrive = await uploadToGoogleDrive(uri);
