@@ -5,11 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "debitmanager",
+    "scheme": "debitm1",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.oshandev.debitmanager"
+      "package": "com.oshandev.debitm1"
     },
     "web": {
       "output": "static",
@@ -47,7 +52,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -57,6 +63,10 @@
       "router": {},
       "eas": {
         "projectId": "acd8734d-202a-4bc8-b538-14295d63b046"
+      },
+      "backup": {
+        "uploadUrl": "",
+        "authToken": ""
       }
     }
   }

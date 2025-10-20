@@ -2,7 +2,8 @@ import { useSQLiteContext } from '@/database/db';
 import { getStatistics } from '@/database/debtorService';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { backupNow } from '../../utils/backupV2';
 
 export default function Index() {
   const db = useSQLiteContext();
@@ -39,6 +40,21 @@ export default function Index() {
     return '✓ All settled';
   };
 
+  const handleBackupNow = async () => {
+    try {
+      const { uri, uploaded, shared } = await backupNow();
+      if (uploaded) {
+        Alert.alert('Backup complete', 'Backup uploaded successfully.');
+      } else if (shared) {
+        // Shared via OS share sheet
+      } else {
+        Alert.alert('Backup saved', `Backup saved at ${uri}`);
+      }
+    } catch (e: any) {
+      Alert.alert('Backup failed', e?.message ?? 'Unknown error');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -55,6 +71,13 @@ export default function Index() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Backup button */}
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.backupButton} onPress={handleBackupNow}>
+            <Text style={styles.backupButtonText}>Backup Now</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.statsContainer}>
           {/* Total Balance Card - Highlighted */}
           <View style={[styles.statCard, styles.balanceCard]}>
@@ -138,6 +161,23 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  actionBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  backupButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  backupButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   statsContainer: {
     padding: 16,

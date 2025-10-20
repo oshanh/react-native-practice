@@ -1,6 +1,7 @@
 import { getSQLiteProvider, migrateDbIfNeeded } from "@/database/db";
+import { registerBackgroundBackup } from "@/utils/backgroundBackup";
 import { Stack } from "expo-router";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 const SQLiteProvider: any = getSQLiteProvider();
 
@@ -15,6 +16,12 @@ function LoadingFallback() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Register periodic background backup (every 6 hours)
+    registerBackgroundBackup(60 * 6).catch(() => {
+      // Best-effort registration; ignore failures in dev
+    });
+  }, []);
   return (
     <Suspense fallback={<LoadingFallback />}>
       <SQLiteProvider databaseName="debitmanager" onInit={migrateDbIfNeeded} useSuspense>
