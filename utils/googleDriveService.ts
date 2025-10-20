@@ -36,7 +36,7 @@ export async function initializeGoogleDrive(config: GoogleDriveConfig) {
 }
 
 /**
- * Sign in to Google and request Drive access
+ * Sign in to Google and request Drive access 
  */
 export async function signInToGoogleDrive(): Promise<{
   user: any;
