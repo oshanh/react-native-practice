@@ -1,7 +1,8 @@
 import { useSQLiteContext } from '@/database/db';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View,Alert, DevSettings,TouchableOpacity } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View, Alert, TouchableOpacity } from 'react-native';
+import { reloadApp } from '../../utils/reload';
 import { getAccessToken, getOrCreateBackupFolder, isSignedInToGoogleDrive,restoreLatestBackupFromGoogleDrive, listBackupFiles as listDriveBackups } from '../../utils/googleDriveService';
 import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
 import * as DocumentPicker from 'expo-document-picker';
@@ -136,7 +137,7 @@ export default function BackupsScreen() {
                 {
                   text: 'OK',
                   onPress: () => {
-                    try { DevSettings.reload(); } catch {}
+                    reloadApp().catch(() => {});
                   },
                 },
               ]
@@ -162,7 +163,7 @@ export default function BackupsScreen() {
           'Restore complete',
           'Backup restored from local file. The app will reload to apply changes.',
           [
-            { text: 'OK', onPress: () => { try { DevSettings.reload(); } catch {} } },
+            { text: 'OK', onPress: () => { reloadApp().catch(() => {}); } },
           ]
         );
       } catch (e: any) {

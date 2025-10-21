@@ -70,7 +70,7 @@
         "authToken": ""
       },
       "googleDrive": {
-        "webClientId": "188962916113-ga5ve15f5mvqv8smpkrieth2hk47vsua.apps.googleusercontent.com",
+        "webClientId": "188962916113-ga5ve15f5mvqv8smpkrieth2hk47vsua .apps.googleusercontent.com",
         "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com"
       }
     }
