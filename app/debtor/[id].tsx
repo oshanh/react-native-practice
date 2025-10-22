@@ -3,6 +3,8 @@ import AddPaymentModal from '@/components/AddPaymentModal';
 import { useSQLiteContext } from '@/database/db';
 import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtorBalance } from '@/database/debtorService';
 import { Debtor } from '@/types/debtor';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -69,8 +71,23 @@ export default function DebtorDetailScreen() {
     Linking.openURL(`tel:${phoneNumber}`);
   };
 
-  const handleSMS = (phoneNumber: string) => {
-    Linking.openURL(`sms:${phoneNumber}`);
+  const handleWhatsApp = (phoneNumber: string) => {
+    if (!debtor) return;
+    const balance = debtor.balance;
+    const message = `Balance = Rs.${Math.abs(balance).toFixed(2)}. `;
+    let digits = phoneNumber.replace(/[^0-9]/g, '');
+    if (digits.startsWith('0')) {
+      digits = '94' + digits.slice(1);
+    } else if (!digits.startsWith('94')) {
+      digits = '94' + digits;
+    }
+    const url = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+    Linking.openURL(url);
+  };
+
+  const handleCopy = async (phoneNumber: string) => {
+    await Clipboard.setStringAsync(phoneNumber);
+    Alert.alert('Copied', 'Phone number copied to clipboard');
   };
 
   const handleAddPayment = () => setShowPaymentModal(true);
@@ -155,9 +172,6 @@ export default function DebtorDetailScreen() {
     <View style={styles.container}>
       {/* Fixed Header Card */}
       <View style={styles.headerCard}>
-        <TouchableOpacity style={styles.backButtonTop} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
-        </TouchableOpacity>
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>{debtor.name.charAt(0).toUpperCase()}</Text>
         </View>
@@ -183,20 +197,26 @@ export default function DebtorDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Phone Numbers</Text>
         {debtor.phoneNumbers.map((phone) => (
-          <View key={phone} style={styles.phoneCard}>
+          <View key={phone} style={styles.phoneCardRedesign}>
             <Text style={styles.phoneNumber}>{phone}</Text>
-            <View style={styles.phoneActions}>
+            <View style={styles.phoneActionsRedesign}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.callButton]}
+                style={styles.iconButton}
                 onPress={() => handleCall(phone)}
               >
-                <Text style={styles.actionButtonText}>📞 Call</Text>
+                <Ionicons name="call" size={22} color="#4caf50" />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, styles.smsButton]}
-                onPress={() => handleSMS(phone)}
+                style={styles.iconButton}
+                onPress={() => handleWhatsApp(phone)}
               >
-                <Text style={styles.actionButtonText}>💬 SMS</Text>
+                <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => handleCopy(phone)}
+              >
+                <Ionicons name="copy" size={22} color="#f59e42" />
               </TouchableOpacity>
             </View>
           </View>
@@ -340,7 +360,7 @@ const styles = StyleSheet.create({
   },
   backButtonTop: {
     position: 'absolute',
-    top: 10,
+    top: 25,
     left: 10,
     width: 36,
     height: 36,
@@ -411,20 +431,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 12,
   },
-  phoneCard: {
+  phoneCardRedesign: {
     backgroundColor: '#1a1d21',
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   phoneNumber: {
     fontSize: 18,
     color: '#fff',
-    marginBottom: 12,
+    marginRight: 12,
+    fontWeight: '500',
+    letterSpacing: 1,
   },
-  phoneActions: {
+  phoneActionsRedesign: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+  },
+  iconButton: {
+    backgroundColor: 'transparent',
+    padding: 6,
+    borderRadius: 8,
+    marginLeft: 2,
   },
   actionButton: {
     flex: 1,

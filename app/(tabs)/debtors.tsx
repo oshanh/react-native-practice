@@ -179,12 +179,12 @@ const styles = StyleSheet.create({
   },
   debtorBalanceIcon: {
     fontSize: 16,
-    color: '#10b981',
+    color: '#f59e42',
     marginRight: 2,
   },
   debtorBalance: {
     fontSize: 16,
-    color: '#10b981',
+    color: '#f59e42',
     fontWeight: '600',
   },
   debtorPhoneIcon: {

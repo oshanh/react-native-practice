@@ -118,7 +118,7 @@ export default function AddDebtModal({ visible, onClose, onAdd }: Readonly<AddDe
             placeholderTextColor="#999"
             value={note}
             onChangeText={setNote}
-            multiline
+            
           />
           <View style={styles.buttonRow}>
             <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
