@@ -293,7 +293,9 @@ export default function DebtorDetailScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Last Updated:</Text>
             <Text style={styles.infoValue}>
-              {debtor.updatedAt ? new Date(debtor.updatedAt).toLocaleDateString() : 'N/A'}
+              {debtor.updatedAt
+                ? `${new Date(debtor.updatedAt).toLocaleDateString()} ${new Date(debtor.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
+                : 'N/A'}
             </Text>
           </View>
         </View>
