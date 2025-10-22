@@ -1,10 +1,11 @@
 import { useSQLiteContext } from '@/database/db';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { registerBackgroundBackup } from '../../utils/backgroundBackup';
 import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
 import {
@@ -18,7 +19,6 @@ import {
   signInToGoogleDrive,
   signOutFromGoogleDrive,
 } from '../../utils/googleDriveService';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { reloadApp } from '../../utils/reload';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -78,17 +78,17 @@ export default function BackupsScreen() {
 
         if (signedIn) {
           try {
-            const userInfo = await GoogleSignin.signInSilently();
-            console.log('[GoogleSignin] signInSilently userInfo:', JSON.stringify(userInfo, null, 2));
+            const userInfo: any = await GoogleSignin.signInSilently();
             // Extract user object and email from userInfo.data.user
             const user = userInfo?.data?.user ?? {};
             const email = user?.email ?? null;
             setUser({ ...user, email });
           } catch (e) {
             // fallback to getCurrentUser
-            const currentUser = getCurrentUser();
+            console.error('[GoogleSignin] signInSilently failed, using getCurrentUser:', e);
+            const currentUser: any = getCurrentUser();
             console.log('[GoogleSignin] getCurrentUser:', JSON.stringify(currentUser, null, 2));
-            let email = currentUser?.email || currentUser?.user?.email || null;
+            const email = currentUser?.email || currentUser?.user?.email || null;
             setUser({ ...currentUser, email });
           }
         }
