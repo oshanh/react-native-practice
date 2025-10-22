@@ -1,14 +1,27 @@
 import { useSQLiteContext } from '@/database/db';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View, Alert, TouchableOpacity } from 'react-native';
-import { reloadApp } from '../../utils/reload';
-import { getAccessToken, getOrCreateBackupFolder, isSignedInToGoogleDrive,restoreLatestBackupFromGoogleDrive, listBackupFiles as listDriveBackups } from '../../utils/googleDriveService';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { registerBackgroundBackup } from '../../utils/backgroundBackup';
 import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
-import * as DocumentPicker from 'expo-document-picker';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  getAccessToken,
+  getCurrentUser,
+  getOrCreateBackupFolder,
+  initializeGoogleDrive,
+  isSignedInToGoogleDrive,
+  listBackupFiles as listDriveBackups,
+  restoreLatestBackupFromGoogleDrive,
+  signInToGoogleDrive,
+  signOutFromGoogleDrive,
+} from '../../utils/googleDriveService';
+import { reloadApp } from '../../utils/reload';
 
-
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Constants: any = require('expo-constants');
 
 export default function BackupsScreen() {
   const db = useSQLiteContext();
@@ -17,49 +30,192 @@ export default function BackupsScreen() {
   const [sqliteFiles, setSqliteFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [backupFrequency, setBackupFrequency] = useState<number>(360);
+  const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [initializing, setInitializing] = useState(true);
+
+  const frequencyOptions = [
+    { label: '1 min', value: 1 },
+    { label: '5 min', value: 5 },
+    { label: '15 min', value: 15 },
+    { label: '30 min', value: 30 },
+    { label: '1 hour', value: 60 },
+    { label: '6 hours', value: 360 },
+    { label: '12 hours', value: 720 },
+    { label: '24 hours', value: 1440 },
+  ];
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // List local backups
-        const DOC_DIR = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
-        const BACKUP_DIR = `${DOC_DIR}backups/`;
-        let localFiles: any[] = [];
-        try {
-          const files = await FileSystem.readDirectoryAsync(BACKUP_DIR);
-          localFiles = await Promise.all(files.map(async (name) => {
-            const info = await FileSystem.getInfoAsync(BACKUP_DIR + name);
-            return { name, ...info };
-          }));
-        } catch {}
-        setLocalBackups(localFiles);
-
-        // List all files in SQLite directory
-        const SQLITE_DIR = `${DOC_DIR}SQLite/`;
-        let sqliteListing: string[] = [];
-        try {
-          sqliteListing = await FileSystem.readDirectoryAsync(SQLITE_DIR);
-        } catch {}
-        setSqliteFiles(sqliteListing);
-
-        // List Google Drive backups
-        let driveFiles: any[] = [];
-        const signedIn = await isSignedInToGoogleDrive();
-        if (signedIn) {
-          const accessToken = await getAccessToken();
-          const folderId = await getOrCreateBackupFolder(accessToken);
-          driveFiles = await listDriveBackups(accessToken, folderId);
-        }
-        setDriveBackups(driveFiles);
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load backups');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    initGoogleDrive();
   }, []);
+
+  const initGoogleDrive = async () => {
+    try {
+      setInitializing(true);
+      
+      // Get config from app.json
+      const extra: any = Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
+      const webClientId = extra?.googleDrive?.webClientId;
+      
+      // Only initialize if webClientId is available
+      if (webClientId) {
+        // Initialize Google Drive
+        await initializeGoogleDrive({
+          webClientId: webClientId,
+          scopes: ['https://www.googleapis.com/auth/drive.file'],
+        });
+
+        // Check if already signed in
+        const signedIn = await isSignedInToGoogleDrive();
+        setIsSignedIn(signedIn);
+
+        if (signedIn) {
+          const currentUser = getCurrentUser();
+          setUser(currentUser);
+        }
+      } else {
+        console.warn('Google Drive webClientId not configured. Sign-in will be disabled.');
+      }
+
+      // Load backups after initialization
+      await loadBackups();
+    } catch (error: any) {
+      console.error('Failed to initialize Google Drive:', error);
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('offline use requires server web ClientID')) {
+        setError('Google Drive setup incomplete. Please check your configuration and rebuild the app.');
+      } else {
+        setError('Failed to initialize Google Drive');
+      }
+    } finally {
+      setInitializing(false);
+    }
+  };
+
+  const loadBackups = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Load backup frequency preference
+      const savedFreq = await AsyncStorage.getItem('backupFrequency');
+      if (savedFreq) {
+        setBackupFrequency(Number.parseInt(savedFreq, 10));
+      }
+
+      // Load last backup timestamp
+      const ts = await getLastBackupTimestamp();
+      setLastBackup(ts);
+
+      // Check sign-in status
+      const signedIn = await isSignedInToGoogleDrive();
+      setIsSignedIn(signedIn);
+
+      // List local backups
+      const DOC_DIR = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
+      const BACKUP_DIR = `${DOC_DIR}backups/`;
+      let localFiles: any[] = [];
+      try {
+        const files = await FileSystem.readDirectoryAsync(BACKUP_DIR);
+        localFiles = await Promise.all(files.map(async (name) => {
+          const info = await FileSystem.getInfoAsync(BACKUP_DIR + name);
+          return { name, ...info };
+        }));
+      } catch {}
+      setLocalBackups(localFiles);
+
+      // List all files in SQLite directory
+      const SQLITE_DIR = `${DOC_DIR}SQLite/`;
+      let sqliteListing: string[] = [];
+      try {
+        sqliteListing = await FileSystem.readDirectoryAsync(SQLITE_DIR);
+      } catch {}
+      setSqliteFiles(sqliteListing);
+
+      // List Google Drive backups
+      let driveFiles: any[] = [];
+      if (signedIn) {
+        const accessToken = await getAccessToken();
+        const folderId = await getOrCreateBackupFolder(accessToken);
+        driveFiles = await listDriveBackups(accessToken, folderId);
+      }
+      setDriveBackups(driveFiles);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load backups');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFrequencyChange = async (minutes: number) => {
+    try {
+      setBackupFrequency(minutes);
+      await AsyncStorage.setItem('backupFrequency', minutes.toString());
+      await registerBackgroundBackup(minutes);
+      Alert.alert('Success', `Backup frequency updated to every ${frequencyOptions.find(o => o.value === minutes)?.label}`);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to update backup frequency');
+    }
+  };
+
+  const handleBackupNow = async () => {
+    try {
+      const { uri, googleDrive } = await backupNow();
+      await loadBackups(); // Refresh the list
+      if (googleDrive) {
+        Alert.alert('Backup complete', 'Backup uploaded to Google Drive successfully! ☁️');
+      } else {
+        Alert.alert('Backup saved', `Backup saved locally at ${uri}`);
+      }
+    } catch (e: any) {
+      Alert.alert('Backup failed', e?.message ?? 'Unknown error');
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      setLoading(true);
+      const { user: signedInUser } = await signInToGoogleDrive();
+      setUser(signedInUser);
+      setIsSignedIn(true);
+      await loadBackups(); // Refresh to show Drive backups
+      Alert.alert('Success', 'Signed in to Google Drive successfully!');
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      Alert.alert('Error', error.message || 'Failed to sign in to Google Drive');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setLoading(true);
+      await signOutFromGoogleDrive();
+      setUser(null);
+      setIsSignedIn(false);
+      setDriveBackups([]); // Clear Drive backups
+      Alert.alert('Success', 'Signed out from Google Drive');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatRelativeTime = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) return 'just now';
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 86400)} days ago`;
+    return date.toLocaleDateString();
+  };
 
   const handleRestoreBackup = async () => {
     
@@ -172,82 +328,429 @@ export default function BackupsScreen() {
     };
 
   return (
-    <View style={styles.container}>
-      
-      <TouchableOpacity
-              style={styles.restoreButton}
-              onPress={handleRestoreBackup}
-              accessibilityRole="button"
-              accessibilityLabel="Restore backup"
+    <ScrollView style={styles.container}>
+      {initializing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Initializing...</Text>
+        </View>
+      ) : (
+        <>
+          {/* Header Section */}
+          <View style={styles.header}>
+            <Ionicons name="cloud" size={32} color="#3b82f6" />
+            <Text style={styles.title}>Backups & Restore</Text>
+            <Text style={styles.subtitle}>
+              {isSignedIn ? `☁️ ${user?.email || 'Connected'}` : '📱 Local backups only'}
+            </Text>
+          </View>
+
+          {/* Google Drive Sign In/Out Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="logo-google" size={18} /> Google Drive
+            </Text>
+            {isSignedIn ? (
+              <>
+                <Text style={styles.infoText}>
+                  ✓ Connected to Google Drive
+                </Text>
+                <Text style={styles.userEmail}>
+                  {user?.email || 'Unknown'}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.signOutButton]}
+                  onPress={handleSignOut}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-out-outline" size={20} color="#fff" />
+                      <Text style={styles.actionButtonText}>Sign Out</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.infoText}>
+                  Sign in to automatically backup your data to Google Drive and access backups from any device.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.signInButton]}
+                  onPress={handleSignIn}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color="#fff" />
+                      <Text style={styles.actionButtonText}>Sign In with Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {/* Last Backup Info */}
+          {lastBackup && (
+            <View style={styles.infoCard}>
+              <Ionicons name="time-outline" size={20} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Last backup: {formatRelativeTime(lastBackup)}
+              </Text>
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.backupButton]}
+              onPress={handleBackupNow}
             >
-              <Text>Restore Last Backup</Text>
-              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
+              <Ionicons name="cloud-upload-outline" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Backup Now</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={[styles.actionButton, styles.restoreButton]}
+              onPress={handleRestoreBackup}
+            >
+              <Ionicons name="cloud-download-outline" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Restore</Text>
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.header}>SQLite Directory Files</Text>
-      {loading ? <ActivityIndicator /> : (
-        <FlatList
-          data={sqliteFiles}
-          keyExtractor={item => item}
-          ListEmptyComponent={<Text style={styles.empty}>No files found in SQLite directory.</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.name}>{item}</Text>
+      {/* Backup Frequency Selector */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="timer-outline" size={18} /> Automatic Backup Frequency
+        </Text>
+        <View style={styles.frequencyButtons}>
+          {frequencyOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.frequencyButton,
+                backupFrequency === option.value && styles.frequencyButtonActive,
+              ]}
+              onPress={() => handleFrequencyChange(option.value)}
+            >
+              <Text
+                style={[
+                  styles.frequencyButtonText,
+                  backupFrequency === option.value && styles.frequencyButtonTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Google Drive Backups */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="cloud-outline" size={18} /> Google Drive Backups ({driveBackups.length})
+        </Text>
+        {loading ? (
+          <ActivityIndicator style={styles.loader} />
+        ) : driveBackups.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="cloud-offline-outline" size={48} color="#d1d5db" />
+            <Text style={styles.emptyText}>
+              {isSignedIn ? 'No backups in Google Drive yet' : 'Sign in to Google Drive in About tab'}
+            </Text>
+          </View>
+        ) : (
+          driveBackups.map((item) => (
+            <View key={item.id} style={styles.backupCard}>
+              <View style={styles.backupHeader}>
+                <Ionicons name="cloud-done-outline" size={20} color="#10b981" />
+                <Text style={styles.backupName}>{item.name}</Text>
+              </View>
+              <Text style={styles.backupMeta}>
+                📅 {item.createdTime ? new Date(item.createdTime).toLocaleString() : '-'}
+              </Text>
             </View>
-          )}
-        />
-      )}
-      <Text style={styles.header}>Local Backups</Text>
-      {loading ? <ActivityIndicator /> : (
-        <FlatList
-          data={localBackups}
-          keyExtractor={item => item.name}
-          ListEmptyComponent={<Text style={styles.empty}>No local backups found.</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>Size: {item.size} bytes</Text>
-              <Text style={styles.meta}>Modified: {item.modificationTime ? new Date(item.modificationTime * 1000).toLocaleString() : '-'}</Text>
+          ))
+        )}
+      </View>
+
+      {/* Local Backups */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="phone-portrait-outline" size={18} /> Local Backups ({localBackups.length})
+        </Text>
+        {loading ? (
+          <ActivityIndicator style={styles.loader} />
+        ) : localBackups.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="folder-open-outline" size={48} color="#d1d5db" />
+            <Text style={styles.emptyText}>No local backups found</Text>
+          </View>
+        ) : (
+          localBackups.map((item) => (
+            <View key={item.name} style={styles.backupCard}>
+              <View style={styles.backupHeader}>
+                <Ionicons name="document-outline" size={20} color="#6b7280" />
+                <Text style={styles.backupName}>{item.name}</Text>
+              </View>
+              <Text style={styles.backupMeta}>
+                💾 {(item.size / 1024).toFixed(1)} KB • {item.modificationTime ? new Date(item.modificationTime * 1000).toLocaleString() : '-'}
+              </Text>
             </View>
-          )}
-        />
+          ))
+        )}
+      </View>
+
+      {/* SQLite Directory (Advanced) */}
+      <TouchableOpacity
+        style={styles.advancedSection}
+        onPress={() => Alert.alert('SQLite Files', sqliteFiles.join('\n') || 'No files found')}
+      >
+        <Text style={styles.advancedText}>
+          <Ionicons name="folder-outline" size={16} /> View SQLite Directory ({sqliteFiles.length} files)
+        </Text>
+        <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
+      </TouchableOpacity>
+
+      {error && (
+        <View style={styles.errorCard}>
+          <Ionicons name="alert-circle-outline" size={20} color="#ef4444" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
       )}
-      <Text style={styles.header}>Google Drive Backups</Text>
-      {loading ? <ActivityIndicator /> : (
-        <FlatList
-          data={driveBackups}
-          keyExtractor={item => item.id || item.name}
-          ListEmptyComponent={<Text style={styles.empty}>No Google Drive backups found.</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>Created: {item.createdTime ? new Date(item.createdTime).toLocaleString() : '-'}</Text>
-              <Text style={styles.meta}>Modified: {item.modifiedTime ? new Date(item.modifiedTime).toLocaleString() : '-'}</Text>
-              <Text style={styles.meta}>ID: {item.id}</Text>
-            </View>
-          )}
-        />
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          💡 Tip: Sign in above to enable automatic cloud backups
+        </Text>
+      </View>
+        </>
       )}
-      {error && <Text style={styles.error}>{error}</Text>}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  header: { fontSize: 18, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
-  item: { padding: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  name: { fontSize: 16, fontWeight: '500' },
-  meta: { fontSize: 12, color: '#666' },
-  empty: { color: '#aaa', fontStyle: 'italic', marginVertical: 8 },
-  error: { color: 'red', marginTop: 16 },
-   restoreButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 20,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  infoText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#3b82f6',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 16,
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 10,
+    gap: 8,
+  },
+  backupButton: {
+    backgroundColor: '#3b82f6',
+  },
+  restoreButton: {
+    backgroundColor: '#10b981',
+  },
+  signInButton: {
+    backgroundColor: '#3b82f6',
+    marginTop: 12,
+  },
+  signOutButton: {
+    backgroundColor: '#ef4444',
+    marginTop: 12,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  section: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  frequencyButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  frequencyButton: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  frequencyButtonActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#2563eb',
+  },
+  frequencyButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  frequencyButtonTextActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  backupCard: {
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  backupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  backupName: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+    flex: 1,
+  },
+  backupMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 28,
+  },
+  advancedSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  advancedText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#dc2626',
+    flex: 1,
+  },
+  footer: {
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 32,
+  },
+  footerText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
