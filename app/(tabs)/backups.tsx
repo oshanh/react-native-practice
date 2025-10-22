@@ -35,6 +35,7 @@ export default function BackupsScreen() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const frequencyOptions = [
     { label: '1 min', value: 1 },
@@ -55,9 +56,11 @@ export default function BackupsScreen() {
     try {
       setInitializing(true);
       
-      // Get config from app.json
-      const extra: any = Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
-      const webClientId = extra?.googleDrive?.webClientId;
+      // HARDCODED for now - we can make this configurable later via env vars
+      // This is needed because after prebuild, Constants.expoConfig may not have the extra config
+      const webClientId = '188962916113-ga5ve15f5mvqv8smpkrieth2hk47vsua.apps.googleusercontent.com';
+      
+      console.log('[InitGoogleDrive] Using webClientId:', webClientId);
       
       // Only initialize if webClientId is available
       if (webClientId) {
@@ -218,7 +221,7 @@ export default function BackupsScreen() {
   };
 
   const handleRestoreBackup = async () => {
-    
+      setIsRestoring(true);
       try {
         // Flush and close DB before overwriting the file
         try {
@@ -286,18 +289,10 @@ export default function BackupsScreen() {
             const afterInfo = await FileSystem.getInfoAsync(DB_PATH);
             console.log('[Restore] DB_PATH AFTER restore info:', JSON.stringify(afterInfo));
             try { console.log('[Restore] ALT_DB_PATH AFTER restore info:', JSON.stringify(await FileSystem.getInfoAsync(ALT_DB_PATH))); } catch {}
-            Alert.alert(
-              'Restore complete',
-              'Latest backup from Google Drive restored. The app will reload to apply changes.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    reloadApp().catch(() => {});
-                  },
-                },
-              ]
-            );
+            
+            // Reload immediately to prevent "Access to closed resource" errors
+            console.log('[Restore] Reloading app immediately...');
+            await reloadApp();
             
             return;
           }
@@ -315,14 +310,12 @@ export default function BackupsScreen() {
         }
         try { await FileSystem.deleteAsync(`${DB_PATH}-wal`, { idempotent: true }); } catch {}
         try { await FileSystem.deleteAsync(`${DB_PATH}-shm`, { idempotent: true }); } catch {}
-        Alert.alert(
-          'Restore complete',
-          'Backup restored from local file. The app will reload to apply changes.',
-          [
-            { text: 'OK', onPress: () => { reloadApp().catch(() => {}); } },
-          ]
-        );
+        
+        // Reload immediately to prevent "Access to closed resource" errors
+        console.log('[Restore] Reloading app immediately...');
+        await reloadApp();
       } catch (e: any) {
+        setIsRestoring(false);
         Alert.alert('Restore failed', e?.message ?? 'Unknown error');
       }
     };
@@ -333,6 +326,14 @@ export default function BackupsScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
           <Text style={styles.loadingText}>Initializing...</Text>
+        </View>
+      ) : isRestoring ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Restoring backup...</Text>
+          <Text style={[styles.loadingText, { fontSize: 14, marginTop: 8 }]}>
+            App will reload automatically
+          </Text>
         </View>
       ) : (
         <>
@@ -411,6 +412,7 @@ export default function BackupsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.backupButton]}
               onPress={handleBackupNow}
+              disabled={loading || isRestoring}
             >
               <Ionicons name="cloud-upload-outline" size={24} color="#fff" />
               <Text style={styles.actionButtonText}>Backup Now</Text>
@@ -419,6 +421,7 @@ export default function BackupsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.restoreButton]}
               onPress={handleRestoreBackup}
+              disabled={loading || isRestoring}
             >
               <Ionicons name="cloud-download-outline" size={24} color="#fff" />
               <Text style={styles.actionButtonText}>Restore</Text>
