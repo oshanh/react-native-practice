@@ -1,8 +1,10 @@
 import { useSQLiteContext } from '@/database/db';
 import { addDebtor } from '@/database/debtorService';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,6 +23,44 @@ interface AddDebtorModalProps {
 }
 
 export default function AddDebtorModal({ visible, onClose, onSuccess }: AddDebtorModalProps) {
+  const [showModal, setShowModal] = useState(visible);
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const scaleAnim = useState(new Animated.Value(0.9))[0];
+
+  // Handle fade in/out when visible changes
+  React.useEffect(() => {
+    if (visible) {
+      setShowModal(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 40,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setShowModal(false));
+    }
+  }, [visible, fadeAnim, scaleAnim]);
   const db = useSQLiteContext();
   const [name, setName] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['']);
@@ -86,8 +126,7 @@ export default function AddDebtorModal({ visible, onClose, onSuccess }: AddDebto
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
+      visible={showModal}
       transparent={true}
       onRequestClose={handleCancel}
     >
@@ -95,7 +134,7 @@ export default function AddDebtorModal({ visible, onClose, onSuccess }: AddDebto
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
+        <Animated.View style={[styles.modalContent, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}> 
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add New Debtor</Text>
             <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
@@ -187,7 +226,7 @@ export default function AddDebtorModal({ visible, onClose, onSuccess }: AddDebto
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -197,14 +236,21 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#1a1d21',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
+    width: '90%',
     maxHeight: '90%',
     paddingBottom: 20,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
