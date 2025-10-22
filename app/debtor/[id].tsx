@@ -31,6 +31,8 @@ export default function DebtorDetailScreen() {
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
   const [addPhoneModalVisible, setAddPhoneModalVisible] = useState(false);
   const [newPhoneValue, setNewPhoneValue] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Reload data whenever screen comes into focus
   useFocusEffect(
@@ -79,7 +81,7 @@ export default function DebtorDetailScreen() {
     if (!debtor) return;
     const balance = debtor.balance;
     const message = `Balance = Rs.${Math.abs(balance).toFixed(2)}. `;
-    let digits = phoneNumber.replace(/[^0-9]/g, '');
+    let digits = phoneNumber.replaceAll(/\D/g, '');
     if (digits.startsWith('0')) {
       digits = '94' + digits.slice(1);
     } else if (!digits.startsWith('94')) {
@@ -101,6 +103,14 @@ export default function DebtorDetailScreen() {
 
   const handleAddPhoneSubmit = async () => {
     if (!debtor || !newPhoneValue.trim()) return;
+    
+    // Validate phone number: exactly 10 digits
+    const digits = newPhoneValue.trim().replaceAll(/\D/g, '');
+    if (digits.length !== 10) {
+      Alert.alert('Invalid Phone Number', 'Phone number must be exactly 10 digits.');
+      return;
+    }
+    
     try {
       const updatedPhones = [...debtor.phoneNumbers, newPhoneValue.trim()];
       await updateDebtor(db, debtor.id, debtor.name, updatedPhones, debtor.balance);
@@ -113,6 +123,19 @@ export default function DebtorDetailScreen() {
     }
   };
 
+  const performDeletePhone = async (idx: number) => {
+    if (!debtor) return;
+    try {
+      const updatedPhones = debtor.phoneNumbers.filter((_, i) => i !== idx);
+      await updateDebtor(db, debtor.id, debtor.name, updatedPhones, debtor.balance);
+      await loadDebtor();
+      Alert.alert('Success', 'Phone number deleted successfully');
+    } catch (error) {
+      console.error('Error deleting phone number:', error);
+      Alert.alert('Error', 'Failed to delete phone number');
+    }
+  };
+
   const handleDeletePhone = (index: number) => {
     if (!debtor) return;
     Alert.alert('Delete Phone Number', 'Are you sure you want to delete this phone number?', [
@@ -120,17 +143,7 @@ export default function DebtorDetailScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          try {
-            const updatedPhones = debtor.phoneNumbers.filter((_, i) => i !== index);
-            await updateDebtor(db, debtor.id, debtor.name, updatedPhones, debtor.balance);
-            await loadDebtor();
-            Alert.alert('Success', 'Phone number deleted successfully');
-          } catch (error) {
-            console.error('Error deleting phone number:', error);
-            Alert.alert('Error', 'Failed to delete phone number');
-          }
-        },
+        onPress: () => { void performDeletePhone(index); },
       },
     ]);
   };
@@ -168,30 +181,25 @@ export default function DebtorDetailScreen() {
 
   const handleDelete = () => {
     if (!debtor) return;
-    Alert.alert(
-      'Delete Debtor',
-      `Are you sure you want to delete ${debtor.name}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            // Use setTimeout to allow async
-            setTimeout(async () => {
-              try {
-                await deleteDebtor(db, debtor.id);
-                Alert.alert('Success', 'Debtor deleted successfully');
-                router.back();
-              } catch (error) {
-                console.error('Error deleting debtor:', error);
-                Alert.alert('Error', 'Failed to delete debtor');
-              }
-            }, 0);
-          },
-        },
-      ]
-    );
+    setDeleteConfirmText('');
+    setDeleteConfirmVisible(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!debtor) return;
+    if (deleteConfirmText.trim() !== 'CONFIRM') {
+      Alert.alert('Type "CONFIRM"', 'Please type "CONFIRM" to proceed.');
+      return;
+    }
+    try {
+      await deleteDebtor(db, debtor.id);
+      setDeleteConfirmVisible(false);
+      Alert.alert('Success', 'Debtor deleted successfully');
+      router.back();
+    } catch (error) {
+      console.error('Error deleting debtor:', error);
+      Alert.alert('Error', 'Failed to delete debtor');
+    }
   };
 
   if (loading) {
@@ -344,10 +352,15 @@ export default function DebtorDetailScreen() {
             <TextInput
               style={styles.modalInput}
               value={newPhoneValue}
-              onChangeText={setNewPhoneValue}
+              onChangeText={(text) => {
+                // Only allow digits
+                const digitsOnly = text.replaceAll(/\D/g, '');
+                setNewPhoneValue(digitsOnly);
+              }}
               placeholder="Enter phone number"
               keyboardType="phone-pad"
               placeholderTextColor="#9ba1a6"
+              maxLength={10}
             />
             <View style={styles.modalActionsRow}>
               <TouchableOpacity style={styles.modalButton} onPress={() => setAddPhoneModalVisible(false)}>
@@ -355,6 +368,41 @@ export default function DebtorDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary]} onPress={handleAddPhoneSubmit}>
                 <Text style={styles.modalButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Delete Debtor Modal */}
+      <Modal visible={deleteConfirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentPhone}>
+            <Text style={styles.modalTitle}>Confirm Delete</Text>
+            <Text style={{ color: '#9ba1a6', marginBottom: 12, textAlign: 'center' }}>
+              To delete "{debtor.name}", type <Text style={{ color: '#fff', fontWeight: '700' }}>CONFIRM</Text> below.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="type CONFIRM"
+              autoCapitalize="none"
+              placeholderTextColor="#9ba1a6"
+            />
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setDeleteConfirmVisible(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  deleteConfirmText.trim() === 'CONFIRM' ? styles.modalButtonPrimary : styles.modalButtonDisabled,
+                ]}
+                disabled={deleteConfirmText.trim() !== 'CONFIRM'}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={styles.modalButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -736,6 +784,9 @@ const styles = StyleSheet.create({
   },
   modalButtonPrimary: {
     backgroundColor: '#3b82f6',
+  },
+  modalButtonDisabled: {
+    backgroundColor: '#475569',
   },
   modalButtonText: {
     color: '#fff',
