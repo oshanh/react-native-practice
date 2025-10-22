@@ -364,15 +364,6 @@ export default function BackupsScreen() {
         </View>
       ) : (
         <>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <Ionicons name="cloud" size={32} color="#3b82f6" />
-            <Text style={styles.title}>Backups & Restore</Text>
-            <Text style={styles.subtitle}>
-              {isSignedIn ? `☁️ ${user?.email || 'Connected'}` : '📱 Local backups only'}
-            </Text>
-          </View>
-
           {/* Google Drive Sign In/Out Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>

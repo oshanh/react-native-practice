@@ -6,6 +6,7 @@ export const BACKUP_TASK = 'debitmanager-background-backup';
 
 TaskManager.defineTask(BACKUP_TASK, async () => {
   try {
+    console.log('Running background backup task...');
     await backupNow();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch (e) {
@@ -15,6 +16,7 @@ TaskManager.defineTask(BACKUP_TASK, async () => {
 });
 
 export async function registerBackgroundBackup(intervalMinutes = 60) {
+  console.log(`Registering background backup task with interval: ${intervalMinutes} minutes`);
   await BackgroundTask.registerTaskAsync(BACKUP_TASK, {
     minimumInterval: intervalMinutes * 60, // seconds
   });
