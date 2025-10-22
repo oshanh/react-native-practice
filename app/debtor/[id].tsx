@@ -145,7 +145,7 @@ export default function DebtorDetailScreen() {
       await updateDebtorBalance(db, debtor.id, debtor.balance - amount);
       await loadDebtor();
       await loadTransactions();
-      Alert.alert('Success', `Payment of $${amount.toFixed(2)} added`);
+      Alert.alert('Success', `Payment of Rs.${amount.toFixed(2)} added`);
     } catch {
       Alert.alert('Error', 'Failed to add payment');
     }
@@ -159,7 +159,7 @@ export default function DebtorDetailScreen() {
       await updateDebtorBalance(db, debtor.id, debtor.balance + amount);
       await loadDebtor();
       await loadTransactions();
-      Alert.alert('Success', `Debt of $${amount.toFixed(2)} added`);
+      Alert.alert('Success', `Debt of Rs.${amount.toFixed(2)} added`);
     } catch {
       Alert.alert('Error', 'Failed to add debt');
     }
