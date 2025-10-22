@@ -113,6 +113,28 @@ export default function DebtorDetailScreen() {
     }
   };
 
+  const handleDeletePhone = (index: number) => {
+    if (!debtor) return;
+    Alert.alert('Delete Phone Number', 'Are you sure you want to delete this phone number?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const updatedPhones = debtor.phoneNumbers.filter((_, i) => i !== index);
+            await updateDebtor(db, debtor.id, debtor.name, updatedPhones, debtor.balance);
+            await loadDebtor();
+            Alert.alert('Success', 'Phone number deleted successfully');
+          } catch (error) {
+            console.error('Error deleting phone number:', error);
+            Alert.alert('Error', 'Failed to delete phone number');
+          }
+        },
+      },
+    ]);
+  };
+
   const handleAddPayment = () => setShowPaymentModal(true);
   const handleAddDebt = () => setShowDebtModal(true);
 
@@ -224,8 +246,8 @@ export default function DebtorDetailScreen() {
             <Ionicons name="add-circle" size={26} color="#3b82f6" />
           </TouchableOpacity>
         </View>
-        {debtor.phoneNumbers.map((phone) => (
-          <View key={phone} style={styles.phoneCardRedesign}>
+        {debtor.phoneNumbers.map((phone, index) => (
+          <View key={phone + index} style={styles.phoneCardRedesign}>
             <Text style={styles.phoneNumber}>{phone}</Text>
             <View style={styles.phoneActionsRedesign}>
               <TouchableOpacity
@@ -245,6 +267,12 @@ export default function DebtorDetailScreen() {
                 onPress={() => handleCopy(phone)}
               >
                 <Ionicons name="copy" size={22} color="#f59e42" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => handleDeletePhone(index)}
+              >
+                <Ionicons name="trash" size={22} color="#ef4444" />
               </TouchableOpacity>
             </View>
           </View>
