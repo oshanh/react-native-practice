@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from 'react-native';
 import { registerBackgroundBackup } from '../../utils/backgroundBackup';
 import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
 import {
@@ -18,6 +18,7 @@ import {
   signInToGoogleDrive,
   signOutFromGoogleDrive,
 } from '../../utils/googleDriveService';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { reloadApp } from '../../utils/reload';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -36,6 +37,7 @@ export default function BackupsScreen() {
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const frequencyOptions = [
     { label: '1 min', value: 1 },
@@ -75,8 +77,20 @@ export default function BackupsScreen() {
         setIsSignedIn(signedIn);
 
         if (signedIn) {
-          const currentUser = getCurrentUser();
-          setUser(currentUser);
+          try {
+            const userInfo = await GoogleSignin.signInSilently();
+            console.log('[GoogleSignin] signInSilently userInfo:', JSON.stringify(userInfo, null, 2));
+            // Extract user object and email from userInfo.data.user
+            const user = userInfo?.data?.user ?? {};
+            const email = user?.email ?? null;
+            setUser({ ...user, email });
+          } catch (e) {
+            // fallback to getCurrentUser
+            const currentUser = getCurrentUser();
+            console.log('[GoogleSignin] getCurrentUser:', JSON.stringify(currentUser, null, 2));
+            let email = currentUser?.email || currentUser?.user?.email || null;
+            setUser({ ...currentUser, email });
+          }
         }
       } else {
         console.warn('Google Drive webClientId not configured. Sign-in will be disabled.');
@@ -321,7 +335,20 @@ export default function BackupsScreen() {
     };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await loadBackups();
+            setRefreshing(false);
+          }}
+          colors={["#3b82f6"]}
+        />
+      }
+    >
       {initializing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
