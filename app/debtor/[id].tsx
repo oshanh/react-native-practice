@@ -1,7 +1,7 @@
 import AddDebtModal from '@/components/AddDebtModal';
 import AddPaymentModal from '@/components/AddPaymentModal';
 import { useSQLiteContext } from '@/database/db';
-import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtorBalance } from '@/database/debtorService';
+import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtor, updateDebtorBalance } from '@/database/debtorService';
 import { Debtor } from '@/types/debtor';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -10,9 +10,11 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -27,6 +29,8 @@ export default function DebtorDetailScreen() {
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
+  const [addPhoneModalVisible, setAddPhoneModalVisible] = useState(false);
+  const [newPhoneValue, setNewPhoneValue] = useState('');
 
   // Reload data whenever screen comes into focus
   useFocusEffect(
@@ -88,6 +92,25 @@ export default function DebtorDetailScreen() {
   const handleCopy = async (phoneNumber: string) => {
     await Clipboard.setStringAsync(phoneNumber);
     Alert.alert('Copied', 'Phone number copied to clipboard');
+  };
+
+  const handleAddPhone = () => {
+    setNewPhoneValue('');
+    setAddPhoneModalVisible(true);
+  };
+
+  const handleAddPhoneSubmit = async () => {
+    if (!debtor || !newPhoneValue.trim()) return;
+    try {
+      const updatedPhones = [...debtor.phoneNumbers, newPhoneValue.trim()];
+      await updateDebtor(db, debtor.id, debtor.name, updatedPhones, debtor.balance);
+      await loadDebtor();
+      setAddPhoneModalVisible(false);
+      Alert.alert('Success', 'Phone number added successfully');
+    } catch (error) {
+      console.error('Error adding phone number:', error);
+      Alert.alert('Error', 'Failed to add phone number');
+    }
   };
 
   const handleAddPayment = () => setShowPaymentModal(true);
@@ -195,7 +218,12 @@ export default function DebtorDetailScreen() {
       <ScrollView style={styles.scrollContent}>
       {/* Phone Numbers Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Phone Numbers</Text>
+        <View style={styles.phoneTitleRow}>
+          <Text style={styles.sectionTitle}>Phone Numbers</Text>
+          <TouchableOpacity onPress={handleAddPhone}>
+            <Ionicons name="add-circle" size={26} color="#3b82f6" />
+          </TouchableOpacity>
+        </View>
         {debtor.phoneNumbers.map((phone) => (
           <View key={phone} style={styles.phoneCardRedesign}>
             <Text style={styles.phoneNumber}>{phone}</Text>
@@ -279,6 +307,31 @@ export default function DebtorDetailScreen() {
             onClose={() => setShowPaymentModal(false)}
             onAdd={handleSubmitPayment}
           />
+
+      {/* Add Phone Modal */}
+      <Modal visible={addPhoneModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentPhone}>
+            <Text style={styles.modalTitle}>Add Phone Number</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newPhoneValue}
+              onChangeText={setNewPhoneValue}
+              placeholder="Enter phone number"
+              keyboardType="phone-pad"
+              placeholderTextColor="#9ba1a6"
+            />
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setAddPhoneModalVisible(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary]} onPress={handleAddPhoneSubmit}>
+                <Text style={styles.modalButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Metadata Section */}
       <View style={styles.section}>
@@ -599,5 +652,66 @@ const styles = StyleSheet.create({
   transactionTime: {
     fontSize: 12,
     color: '#9ba1a6',
+  },
+  phoneTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContentPhone: {
+    backgroundColor: '#23262a',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  modalInput: {
+    width: '100%',
+    backgroundColor: '#1a1d21',
+    color: '#fff',
+    fontSize: 16,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    backgroundColor: '#374151',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#3b82f6',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
 });
