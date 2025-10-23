@@ -5,12 +5,11 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { backupNow, getLastBackupTimestamp } from '../../utils/backupV2';
-import { useDBRefresh } from '../_layout';
+// removed manual refresh UI — no provider refresh hook needed here
 
 export default function Index() {
   const db = useSQLiteContext();
-  const { refreshDb } = useDBRefresh();
-  //console.log(db.databasePath);
+  // manual refresh removed; no-op
   
   const [loading, setLoading] = useState(true);
   const [lastBackup, setLastBackup] = useState<Date | null>(null);
@@ -151,29 +150,7 @@ export default function Index() {
               <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={styles.refreshButton}
-              onPress={() => {
-                Alert.alert(
-                  'Refresh Database Connection',
-                  'This will reinitialize the database connection. Continue?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Refresh', 
-                      onPress: () => {
-                        refreshDb();
-                        Alert.alert('Database Refreshed', 'Connection has been reinitialized.');
-                      }
-                    }
-                  ]
-                );
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Refresh database connection"
-            >
-              <Ionicons name="refresh-outline" size={20} color="#fff" />
-            </TouchableOpacity>
+            {/* manual refresh button removed to avoid user-triggered remounts */}
           </View>
  
         </View>
@@ -284,14 +261,6 @@ const styles = StyleSheet.create({
   },
   backupButton: {
     backgroundColor: '#2563eb',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshButton: {
-    backgroundColor: '#16a34a',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,

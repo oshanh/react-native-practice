@@ -56,13 +56,7 @@ export default function TabLayout() {
           tabBarIcon: BackupsIcon,
         }}
       />
-      <Tabs.Screen
-        name="logs"
-        options={{
-          title: 'Logs',
-          tabBarIcon: LogsIcon,
-        }}
-      />
+      {/* Logs tab removed */}
       <Tabs.Screen
         name="about"
         options={{

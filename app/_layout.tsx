@@ -1,5 +1,4 @@
 import { getSQLiteProvider, logDbStatus, migrateDbIfNeeded, notifyProviderRemounted, registerSQLiteProviderRemount } from "@/database/db";
-import '@/database/dbLogger'; // Initialize logger to start intercepting console logs
 import { Stack } from "expo-router";
 import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
