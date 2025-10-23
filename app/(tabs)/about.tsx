@@ -5,9 +5,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 const Constants: any = require('expo-constants');
 
 export default function AboutScreen() {
-  const appVersion = Constants?.expoConfig?.version || '1.0.0';
-  const appName = Constants?.expoConfig?.name || 'Debit Manager';
-
+  const appVersion = Constants?.default.expoConfig?.version || 'N/A';
+  const appName = Constants?.default.expoConfig?.name || 'Debit Manager';
   return (
     <ScrollView style={styles.container}>
       {/* App Header */}
