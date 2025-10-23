@@ -1,12 +1,10 @@
 import { useSQLiteContext } from '@/database/db';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { registerBackgroundBackup } from '../../utils/backgroundBackup';
 import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
 import {
   getAccessToken,
@@ -31,24 +29,12 @@ export default function BackupsScreen() {
   const [sqliteFiles, setSqliteFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [backupFrequency, setBackupFrequency] = useState<number>(360);
   const [lastBackup, setLastBackup] = useState<Date | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const frequencyOptions = [
-    { label: '1 min', value: 1 },
-    { label: '5 min', value: 5 },
-    { label: '15 min', value: 15 },
-    { label: '30 min', value: 30 },
-    { label: '1 hour', value: 60 },
-    { label: '6 hours', value: 360 },
-    { label: '12 hours', value: 720 },
-    { label: '24 hours', value: 1440 },
-  ];
 
   useEffect(() => {
     initGoogleDrive();
@@ -115,12 +101,6 @@ export default function BackupsScreen() {
     setLoading(true);
     setError(null);
     try {
-      // Load backup frequency preference
-      const savedFreq = await AsyncStorage.getItem('backupFrequency');
-      if (savedFreq) {
-        setBackupFrequency(Number.parseInt(savedFreq, 10));
-      }
-
       // Load last backup timestamp
       const ts = await getLastBackupTimestamp();
       setLastBackup(ts);
@@ -165,16 +145,7 @@ export default function BackupsScreen() {
     }
   };
 
-  const handleFrequencyChange = async (minutes: number) => {
-    try {
-      setBackupFrequency(minutes);
-      await AsyncStorage.setItem('backupFrequency', minutes.toString());
-      await registerBackgroundBackup(minutes);
-      Alert.alert('Success', `Backup frequency updated to every ${frequencyOptions.find(o => o.value === minutes)?.label}`);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to update backup frequency');
-    }
-  };
+
 
   const handleBackupNow = async () => {
     try {
@@ -313,8 +284,9 @@ export default function BackupsScreen() {
         }
         // Fallback: Pick a local file
         const result = await DocumentPicker.getDocumentAsync({
-          type: 'application/x-sqlite3',
+          type: ['application/x-sqlite3', 'application/octet-stream', '*/*'],
           copyToCacheDirectory: true,
+          multiple: false,
         });
         if (!result?.assets?.[0]?.uri || result.canceled) return;
         const uri = result.assets[0].uri;
@@ -445,34 +417,6 @@ export default function BackupsScreen() {
               <Text style={styles.actionButtonText}>Restore</Text>
             </TouchableOpacity>
           </View>
-
-      {/* Backup Frequency Selector */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="timer-outline" size={18} /> Automatic Backup Frequency
-        </Text>
-        <View style={styles.frequencyButtons}>
-          {frequencyOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.frequencyButton,
-                backupFrequency === option.value && styles.frequencyButtonActive,
-              ]}
-              onPress={() => handleFrequencyChange(option.value)}
-            >
-              <Text
-                style={[
-                  styles.frequencyButtonText,
-                  backupFrequency === option.value && styles.frequencyButtonTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
 
       {/* Google Drive Backups */}
       <View style={styles.section}>

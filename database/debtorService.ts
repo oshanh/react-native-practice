@@ -8,21 +8,34 @@ export const addTransaction = async (
   amount: number,
   note?: string
 ): Promise<number> => {
-  const stmt = await db.prepareAsync(
-    'INSERT INTO transactions (debtor_id, type, date, time, amount, note) VALUES (?, ?, ?, ?, ?, ?)'
-  );
+  if (!db) {
+    console.warn('[addTransaction] Database is null, cannot add transaction');
+    throw new Error('Database not available');
+  }
+  
   try {
-    const result = await stmt.executeAsync([
-      debtorId,
-      type,
-      date,
-      time,
-      amount,
-      note ?? null
-    ]);
-    return result.lastInsertRowId;
-  } finally {
-    await stmt.finalizeAsync();
+    const stmt = await db.prepareAsync(
+      'INSERT INTO transactions (debtor_id, type, date, time, amount, note) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    try {
+      const result = await stmt.executeAsync([
+        debtorId,
+        type,
+        date,
+        time,
+        amount,
+        note ?? null
+      ]);
+      return result.lastInsertRowId;
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  } catch (error: any) {
+    console.error('[addTransaction] Error adding transaction:', error);
+    if (error?.message?.includes('NativeDatabase') || error?.message?.includes('closed resource')) {
+      throw new Error('Database not available. Please try again.');
+    }
+    throw error;
   }
 };
 
@@ -40,29 +53,51 @@ export const getTransactionsForDebtor = async (
   note: string | null;
   created_at: string;
 }>> => {
-  let query = 'SELECT * FROM transactions WHERE debtor_id = ?';
-  const params: any[] = [debtorId];
-  if (type) {
-    query += ' AND type = ?';
-    params.push(type);
+  if (!db) {
+    console.warn('[getTransactionsForDebtor] Database is null, returning empty array');
+    return [];
   }
-  query += ' ORDER BY date DESC, time DESC';
-  const stmt = await db.prepareAsync(query);
+  
   try {
-    const result = await stmt.executeAsync(params);
-    return await result.getAllAsync() as Array<{
-      id: number;
-      type: 'IN' | 'OUT';
-      date: string;
-      time: string;
-      amount: number;
-      note: string | null;
-      created_at: string;
-    }>;
-  } finally {
-    await stmt.finalizeAsync();
+    let query = 'SELECT * FROM transactions WHERE debtor_id = ?';
+    const params: any[] = [debtorId];
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+    query += ' ORDER BY date DESC, time DESC';
+    const stmt = await db.prepareAsync(query);
+    try {
+      const result = await stmt.executeAsync(params);
+      return await result.getAllAsync() as Array<{
+        id: number;
+        type: 'IN' | 'OUT';
+        date: string;
+        time: string;
+        amount: number;
+        note: string | null;
+        created_at: string;
+      }>;
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  } catch (error: any) {
+    console.error('[getTransactionsForDebtor] Error fetching transactions:', error);
+    const msg = String(error?.message ?? error);
+    if (msg.includes('NativeDatabase') || msg.includes('NullPointerException') || msg.includes('closed resource')) {
+      console.warn('[getTransactionsForDebtor] Database not available, requesting provider refresh');
+      try {
+        await refreshSQLiteProvider();
+        console.log('[getTransactionsForDebtor] refreshSQLiteProvider resolved');
+      } catch (e) {
+        console.warn('[getTransactionsForDebtor] refreshSQLiteProvider failed:', e);
+      }
+      return [];
+    }
+    throw error;
   }
 };
+import { refreshSQLiteProvider } from '@/database/db';
 import { Debtor } from '@/types/debtor';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
@@ -73,6 +108,11 @@ export const addDebtor = async (
   phoneNumbers: string[],
   balance: number = 0
 ): Promise<number> => {
+  if (!db) {
+    console.warn('[addDebtor] Database is null, cannot add debtor');
+    throw new Error('Database not available');
+  }
+  
   try {
     // Use prepared statement for inserting debtor
     const insertDebtorStmt = await db.prepareAsync(
@@ -100,14 +140,23 @@ export const addDebtor = async (
     } finally {
       await insertDebtorStmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error adding debtor:', error);
+  } catch (error: any) {
+    console.error('[addDebtor] Error adding debtor:', error);
+    if (error?.message?.includes('NativeDatabase') || error?.message?.includes('closed resource')) {
+      throw new Error('Database not available. Please try again.');
+    }
     throw error;
   }
 };
 
 // Get all debtors with their phone numbers using prepared statements
 export const getAllDebtors = async (db: SQLiteDatabase): Promise<Debtor[]> => {
+  // Check if DB is accessible before attempting query
+  if (!db) {
+    console.warn('[getAllDebtors] Database connection is null or undefined');
+    return [];
+  }
+
   try {
     const debtorsStmt = await db.prepareAsync(
       'SELECT * FROM debtors ORDER BY name ASC'
@@ -152,8 +201,19 @@ export const getAllDebtors = async (db: SQLiteDatabase): Promise<Debtor[]> => {
     } finally {
       await debtorsStmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error fetching debtors:', error);
+  } catch (error: any) {
+    console.error('[getAllDebtors] Error fetching debtors:', error);
+    const msg = String(error?.message ?? error);
+    if (msg.includes('NativeDatabase') || msg.includes('NullPointerException') || msg.includes('closed resource')) {
+      console.warn('[getAllDebtors] Database not available, requesting provider refresh');
+      try {
+        await refreshSQLiteProvider();
+        console.log('[getAllDebtors] refreshSQLiteProvider resolved');
+      } catch (e) {
+        console.warn('[getAllDebtors] refreshSQLiteProvider failed:', e);
+      }
+      return [];
+    }
     throw error;
   }
 };
@@ -164,6 +224,12 @@ export const getDebtorById = async (
   id: number
 ): Promise<Debtor | null> => {
   try {
+    // Check if DB is accessible before attempting query
+    if (!db) {
+      console.warn('[getDebtorById] Database connection is null or undefined');
+      return null;
+    }
+
     const debtorStmt = await db.prepareAsync(
       'SELECT * FROM debtors WHERE id = ?'
     );
@@ -202,8 +268,19 @@ export const getDebtorById = async (
     } finally {
       await debtorStmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error fetching debtor:', error);
+  } catch (error: any) {
+    console.error('[getDebtorById] Error fetching debtor:', error);
+    const msg = String(error?.message ?? error);
+    if (msg.includes('NativeDatabase') || msg.includes('NullPointerException') || msg.includes('closed resource')) {
+      console.warn('[getDebtorById] Database not available, requesting provider refresh');
+      try {
+        await refreshSQLiteProvider();
+        console.log('[getDebtorById] refreshSQLiteProvider resolved');
+      } catch (e) {
+        console.warn('[getDebtorById] refreshSQLiteProvider failed:', e);
+      }
+      return null;
+    }
     throw error;
   }
 };
@@ -216,6 +293,11 @@ export const updateDebtor = async (
   phoneNumbers: string[],
   balance: number
 ): Promise<void> => {
+  if (!db) {
+    console.warn('[updateDebtor] Database is null, cannot update debtor');
+    throw new Error('Database not available');
+  }
+  
   try {
     // Update debtor using prepared statement
     const updateStmt = await db.prepareAsync(
@@ -251,8 +333,11 @@ export const updateDebtor = async (
     } finally {
       await insertStmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error updating debtor:', error);
+  } catch (error: any) {
+    console.error('[updateDebtor] Error updating debtor:', error);
+    if (error?.message?.includes('NativeDatabase') || error?.message?.includes('closed resource')) {
+      throw new Error('Database not available. Please try again.');
+    }
     throw error;
   }
 };
@@ -262,6 +347,11 @@ export const deleteDebtor = async (
   db: SQLiteDatabase,
   id: number
 ): Promise<void> => {
+  if (!db) {
+    console.warn('[deleteDebtor] Database is null, cannot delete debtor');
+    throw new Error('Database not available');
+  }
+  
   try {
     const stmt = await db.prepareAsync('DELETE FROM debtors WHERE id = ?');
     try {
@@ -269,8 +359,11 @@ export const deleteDebtor = async (
     } finally {
       await stmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error deleting debtor:', error);
+  } catch (error: any) {
+    console.error('[deleteDebtor] Error deleting debtor:', error);
+    if (error?.message?.includes('NativeDatabase') || error?.message?.includes('closed resource')) {
+      throw new Error('Database not available. Please try again.');
+    }
     throw error;
   }
 };
@@ -281,6 +374,11 @@ export const updateDebtorBalance = async (
   id: number,
   newBalance: number
 ): Promise<void> => {
+  if (!db) {
+    console.warn('[updateDebtorBalance] Database is null, cannot update balance');
+    throw new Error('Database not available');
+  }
+  
   try {
     const stmt = await db.prepareAsync(
       'UPDATE debtors SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
@@ -290,8 +388,11 @@ export const updateDebtorBalance = async (
     } finally {
       await stmt.finalizeAsync();
     }
-  } catch (error) {
-    console.error('Error updating balance:', error);
+  } catch (error: any) {
+    console.error('[updateDebtorBalance] Error updating balance:', error);
+    if (error?.message?.includes('NativeDatabase') || error?.message?.includes('closed resource')) {
+      throw new Error('Database not available. Please try again.');
+    }
     throw error;
   }
 };
@@ -305,6 +406,12 @@ export const getStatistics = async (
   totalOut: number;
 }> => {
   try {
+    // Check if DB is accessible before attempting query
+    if (!db) {
+      console.warn('[getStatistics] Database connection is null or undefined');
+      return { totalBalance: 0, totalIn: 0, totalOut: 0 };
+    }
+
     // Get total balance from all debtors
     const balanceStmt = await db.prepareAsync(
       'SELECT COALESCE(SUM(balance), 0) as total FROM debtors'
@@ -349,8 +456,20 @@ export const getStatistics = async (
       totalIn,
       totalOut,
     };
-  } catch (error) {
-    console.error('Error fetching statistics:', error);
+  } catch (error: any) {
+    console.error('[getStatistics] Error fetching statistics:', error);
+    // If DB is closed/null, try to request a provider remount and let caller retry
+    const msg = String(error?.message ?? error);
+    if (msg.includes('NativeDatabase') || msg.includes('NullPointerException') || msg.includes('closed resource')) {
+        console.warn('[getStatistics] Database not available, requesting provider refresh');
+        try {
+          await refreshSQLiteProvider();
+          console.log('[getStatistics] refreshSQLiteProvider resolved');
+        } catch (e) {
+          console.warn('[getStatistics] refreshSQLiteProvider failed:', e);
+        }
+    }
+    // Re-throw so caller (which may have retry logic) can attempt again after provider remount
     throw error;
   }
 };

@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
+import 'expo-sqlite';
+import { closeDatabaseHandlesForBackup } from '@/database/db';
 import {
   getAccessToken,
   getOrCreateBackupFolder,
@@ -60,24 +61,15 @@ function timestamp(): string {
 
 export async function backupDatabase(): Promise<{ uri: string }> {
   const dbPath = await resolveDatabasePath();
-  // Try to flush WAL and close DB to ensure a consistent main DB file
-  const filename = dbPath.split('/').pop() ?? 'debitmanager';
-  const nameCandidates = [filename, filename.replace(/\.db$/i, '')];
-  let flushed = false;
-  for (const name of nameCandidates) {
-    try {
-      const db: SQLiteDatabase = await openDatabaseAsync(name);
-      try {
-        await db.execAsync("PRAGMA wal_checkpoint(TRUNCATE);");
-      } catch {}
-      try { await db.closeAsync?.(); } catch {}
-      flushed = true;
-      break;
-    } catch {
-      // try next candidate
-    }
+  // Try to flush WAL and close DB to ensure a consistent main DB file.
+  // Use the centralized helper in database/db.ts which attempts the open/checkpoint/close.
+  let didFlush = false;
+  try {
+    didFlush = await closeDatabaseHandlesForBackup();
+  } catch (e) {
+    console.warn('[Backup] closeDatabaseHandlesForBackup failed:', e);
   }
-  if (!flushed) {
+  if (didFlush === false) {
     console.log('[Backup] Could not open DB to checkpoint WAL. Proceeding with copy.');
   } else {
     // small delay to ensure file handles released

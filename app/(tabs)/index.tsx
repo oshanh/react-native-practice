@@ -1,21 +1,20 @@
-import { useSQLiteContext } from '@/database/db';
+import { logDbStatus, useSQLiteContext } from '@/database/db';
 import { getStatistics } from '@/database/debtorService';
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, DevSettings, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { backupNow, getLastBackupTimestamp, resolveDatabasePath } from '../../utils/backupV2';
-import { isSignedInToGoogleDrive, restoreLatestBackupFromGoogleDrive } from '../../utils/googleDriveService';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { backupNow, getLastBackupTimestamp } from '../../utils/backupV2';
+import { useDBRefresh } from '../_layout';
 
 export default function Index() {
   const db = useSQLiteContext();
+  const { refreshDb } = useDBRefresh();
+  //console.log(db.databasePath);
+  
   const [loading, setLoading] = useState(true);
   const [lastBackup, setLastBackup] = useState<Date | null>(null);
-  const [now, setNow] = useState<Date>(new Date());
-
-  // Update relative time every minute while this screen is mounted
+  const [now, setNow] = useState<Date>(new Date());  // Update relative time every minute while this screen is mounted
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(id);
@@ -46,13 +45,33 @@ export default function Index() {
     totalOut: 0,
   });
 
-  const loadStatistics = async () => {
+  const loadStatistics = async (retryCount = 0) => {
     try {
       setLoading(true);
+      
+      // Add small delay on retry to allow DB to stabilize
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300 * retryCount));
+      }
+      
+      await logDbStatus(db, `stats:attempt-${retryCount}`);
       const data = await getStatistics(db);
       setStats(data);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
+    } catch (error: any) {
+      console.error('[index] Error loading statistics:', error);
+      
+      // Retry up to 2 times if it's a database error
+      if (retryCount < 2 && (
+        error?.message?.includes('NativeDatabase') || 
+        error?.message?.includes('closed resource') ||
+        error?.message?.includes('NullPointerException')
+      )) {
+        console.log(`[index] Retrying stats... (attempt ${retryCount + 1})`);
+        return loadStatistics(retryCount + 1);
+      }
+      
+      // Set zero stats on final failure
+      setStats({ totalBalance: 0, totalIn: 0, totalOut: 0 });
     } finally {
       setLoading(false);
     }
@@ -132,6 +151,29 @@ export default function Index() {
               <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
             </TouchableOpacity>
             
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={() => {
+                Alert.alert(
+                  'Refresh Database Connection',
+                  'This will reinitialize the database connection. Continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Refresh', 
+                      onPress: () => {
+                        refreshDb();
+                        Alert.alert('Database Refreshed', 'Connection has been reinitialized.');
+                      }
+                    }
+                  ]
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh database connection"
+            >
+              <Ionicons name="refresh-outline" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
  
         </View>
@@ -242,6 +284,14 @@ const styles = StyleSheet.create({
   },
   backupButton: {
     backgroundColor: '#2563eb',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshButton: {
+    backgroundColor: '#16a34a',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,

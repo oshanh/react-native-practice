@@ -1,6 +1,6 @@
 import AddDebtModal from '@/components/AddDebtModal';
 import AddPaymentModal from '@/components/AddPaymentModal';
-import { useSQLiteContext } from '@/database/db';
+import { logDbStatus, useSQLiteContext } from '@/database/db';
 import { addTransaction, deleteDebtor, getDebtorById, getTransactionsForDebtor, updateDebtor, updateDebtorBalance } from '@/database/debtorService';
 import { Debtor } from '@/types/debtor';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,15 +8,15 @@ import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Linking,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Linking,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 export default function DebtorDetailScreen() {
@@ -54,23 +54,64 @@ export default function DebtorDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debtor, filterType]);
 
-  const loadDebtor = async () => {
+  const loadDebtor = async (retryCount = 0) => {
     try {
       setLoading(true);
+      
+      // Add small delay on retry to allow DB to stabilize
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300 * retryCount));
+      }
+      
+      await logDbStatus(db, `debtor:${id}:attempt-${retryCount}`);
       const data = await getDebtorById(db, Number(id));
       setDebtor(data);
-    } catch (error) {
-      console.error('Error loading debtor:', error);
-      Alert.alert('Error', 'Failed to load debtor details');
+    } catch (error: any) {
+      console.error('[debtor detail] Error loading debtor:', error);
+      
+      // Retry up to 2 times if it's a database error
+      if (retryCount < 2 && (
+        error?.message?.includes('NativeDatabase') || 
+        error?.message?.includes('closed resource') ||
+        error?.message?.includes('NullPointerException')
+      )) {
+        console.log(`[debtor detail] Retrying... (attempt ${retryCount + 1})`);
+        return loadDebtor(retryCount + 1);
+      }
+      
+      Alert.alert('Error', 'Failed to load debtor details. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (retryCount = 0) => {
     if (!debtor) return;
-    let txs = await getTransactionsForDebtor(db, debtor.id, filterType === 'ALL' ? undefined : filterType);
-    setTransactions(txs);
+    
+    try {
+      // Add small delay on retry to allow DB to stabilize
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300 * retryCount));
+      }
+      
+      await logDbStatus(db, `transactions:${debtor.id}:attempt-${retryCount}`);
+      let txs = await getTransactionsForDebtor(db, debtor.id, filterType === 'ALL' ? undefined : filterType);
+      setTransactions(txs);
+    } catch (error: any) {
+      console.error('[debtor detail] Error loading transactions:', error);
+      
+      // Retry up to 2 times if it's a database error
+      if (retryCount < 2 && (
+        error?.message?.includes('NativeDatabase') || 
+        error?.message?.includes('closed resource') ||
+        error?.message?.includes('NullPointerException')
+      )) {
+        console.log(`[debtor detail] Retrying transactions... (attempt ${retryCount + 1})`);
+        return loadTransactions(retryCount + 1);
+      }
+      
+      setTransactions([]); // Set empty array on final failure
+    }
   };
 
   const handleCall = (phoneNumber: string) => {
